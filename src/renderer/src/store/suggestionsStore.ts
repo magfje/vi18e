@@ -28,6 +28,8 @@ export const useSuggestionsStore = create<SuggestionsState>()((set, get) => ({
 
     set({ isLoading: true, suggestions: [] })
 
+    console.log(`[suggestionsStore] fetching: "${sourceText.slice(0, 40)}" src=${sourceLanguage} tgt=${targetLanguage}`)
+
     // Query TM and translators in parallel
     const [tmResp, translateResp] = await Promise.allSettled([
       api.tm.query({ sourceText, sourceLanguage, targetLanguage, limit: 9 }),
@@ -35,8 +37,8 @@ export const useSuggestionsStore = create<SuggestionsState>()((set, get) => ({
     ])
 
     const combined: Suggestion[] = []
-    if (tmResp.status === 'fulfilled') combined.push(...tmResp.value.suggestions)
-    if (translateResp.status === 'fulfilled') combined.push(...translateResp.value.suggestions)
+    if (tmResp.status === 'fulfilled') { console.log('[suggestionsStore] TM suggestions:', tmResp.value.suggestions.length); combined.push(...tmResp.value.suggestions) } else { console.warn('[suggestionsStore] TM query failed:', tmResp.reason) }
+    if (translateResp.status === 'fulfilled') { console.log('[suggestionsStore] translate suggestions:', translateResp.value.suggestions.length, 'from', translateResp.value.source); combined.push(...translateResp.value.suggestions) } else { console.warn('[suggestionsStore] translate query failed:', translateResp.reason) }
 
     set({ suggestions: sortSuggestions(combined).slice(0, 9), isLoading: false })
   },

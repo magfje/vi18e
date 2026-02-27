@@ -62,9 +62,15 @@ export const PreferencesStore = {
       for (const [prefix, settings] of Object.entries(data.translators)) {
         if (!settings) continue
         for (const [key, value] of Object.entries(settings)) {
-          if (value !== undefined) store.set(`${prefix}.${key}`, value)
+          if (value !== undefined) {
+            console.log(`[PreferencesStore] set ${prefix}.${key} =`, key === 'apiKey' ? `${String(value).slice(0, 8)}…` : value)
+            store.set(`${prefix}.${key}`, value)
+          }
         }
       }
+      // Verify it was persisted correctly
+      const verify = store.get('translator', {})
+      console.log('[PreferencesStore] store.translator after set:', JSON.stringify(verify).replace(/"apiKey":"[^"]{4}[^"]*"/g, '"apiKey":"<masked>"'))
     }
   },
 
