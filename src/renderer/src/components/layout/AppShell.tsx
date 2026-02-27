@@ -221,6 +221,7 @@ export function AppShell() {
       <StatusBar
         stats={catalog?.stats ?? null}
         filePath={catalog?.filePath ?? null}
+        referenceFilePath={catalog?.referenceFilePath ?? null}
         isDirty={isDirty}
         sourceLanguage={catalog?.metadata.sourceLanguage ?? ''}
         targetLanguage={catalog?.metadata.targetLanguage ?? ''}
