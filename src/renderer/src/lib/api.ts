@@ -16,7 +16,8 @@ import type {
   TranslateRequest,
   TranslateResponse,
   AvailableTranslatorsResponse,
-  PreferencesData
+  PreferencesData,
+  RecentFile
 } from '../../../shared/types/ipc'
 
 declare global {
@@ -36,6 +37,8 @@ export const api = {
       window.api.invoke<OpenFileResponse>(IPC.FILE_OPEN, req),
     save: (req: SaveFileRequest) =>
       window.api.invoke<SaveFileResponse>(IPC.FILE_SAVE, req),
+    recentList: () =>
+      window.api.invoke<RecentFile[]>(IPC.FILE_RECENT_LIST),
     onOpened: (handler: (catalog: OpenFileResponse['catalog']) => void) =>
       window.api.on(IPC.FILE_OPENED, handler as (p: unknown) => void)
   },

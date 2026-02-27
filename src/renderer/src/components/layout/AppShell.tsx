@@ -1,13 +1,16 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels'
 import { useCatalogStore, selectedItem } from '../../store/catalogStore'
 import { CatalogList } from '../catalog-list/CatalogList'
 import { EditingArea } from '../editing-area/EditingArea'
 import { Sidebar } from '../sidebar/Sidebar'
 import { StatusBar } from './StatusBar'
+import { PreferencesDialog } from '../dialogs/PreferencesDialog'
 import { api } from '../../lib/api'
 import { Button } from '../ui/button'
-import { FolderOpen, Save } from 'lucide-react'
+import { DropdownMenu, DropdownItem, DropdownSeparator } from '../ui/dropdown'
+import type { RecentFile } from '../../../../shared/types/ipc'
+import { FolderOpen, Save, Settings, Clock } from 'lucide-react'
 
 export function AppShell() {
   const {
@@ -25,7 +28,15 @@ export function AppShell() {
     clearError
   } = useCatalogStore()
 
+  const [prefsOpen, setPrefsOpen] = useState(false)
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>([])
+
   const item = useCatalogStore(selectedItem)
+
+  // Load recent files on mount
+  useEffect(() => {
+    api.file.recentList().then(setRecentFiles).catch(() => {})
+  }, [])
 
   const handleOpen = async () => {
     const resp = await api.file.openDialog({
@@ -37,7 +48,14 @@ export function AppShell() {
     })
     if (!resp.cancelled && resp.filePaths[0]) {
       await openFile(resp.filePaths[0])
+      // Refresh recent files
+      api.file.recentList().then(setRecentFiles).catch(() => {})
     }
+  }
+
+  const handleOpenRecent = async (filePath: string) => {
+    await openFile(filePath)
+    api.file.recentList().then(setRecentFiles).catch(() => {})
   }
 
   const handleSave = async () => {
@@ -65,10 +83,47 @@ export function AppShell() {
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background flex-shrink-0">
         <span className="font-semibold text-sm mr-2">Poedit TS</span>
+
         <Button variant="outline" size="sm" onClick={handleOpen}>
           <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
           Open
         </Button>
+
+        {/* Recent files dropdown */}
+        <DropdownMenu
+          trigger={
+            <Button variant="ghost" size="sm" title="Recent files">
+              <Clock className="h-3.5 w-3.5" />
+            </Button>
+          }
+        >
+          {recentFiles.length === 0 ? (
+            <DropdownItem disabled>No recent files</DropdownItem>
+          ) : (
+            recentFiles.map((f) => (
+              <DropdownItem key={f.filePath} onClick={() => handleOpenRecent(f.filePath)}>
+                <div className="flex flex-col">
+                  <span className="font-medium text-xs">{basename(f.filePath)}</span>
+                  <span className="text-xs text-muted-foreground truncate max-w-[280px]">
+                    {f.filePath}
+                  </span>
+                </div>
+              </DropdownItem>
+            ))
+          )}
+          {recentFiles.length > 0 && (
+            <>
+              <DropdownSeparator />
+              <DropdownItem
+                onClick={handleOpen}
+                className="text-muted-foreground"
+              >
+                Browse…
+              </DropdownItem>
+            </>
+          )}
+        </DropdownMenu>
+
         <Button
           variant="outline"
           size="sm"
@@ -78,7 +133,16 @@ export function AppShell() {
           <Save className="h-3.5 w-3.5 mr-1.5" />
           Save{isDirty ? ' *' : ''}
         </Button>
+
+        <div className="flex-1" />
+
+        <Button variant="ghost" size="sm" onClick={() => setPrefsOpen(true)}>
+          <Settings className="h-3.5 w-3.5 mr-1.5" />
+          Preferences
+        </Button>
       </div>
+
+      <PreferencesDialog open={prefsOpen} onClose={() => setPrefsOpen(false)} />
 
       {/* Error banner */}
       {error && (
@@ -163,4 +227,9 @@ export function AppShell() {
       />
     </div>
   )
+}
+
+/** Cross-platform basename without importing node:path in renderer */
+function basename(filePath: string): string {
+  return filePath.replace(/\\/g, '/').split('/').pop() ?? filePath
 }

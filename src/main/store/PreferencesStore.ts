@@ -1,5 +1,7 @@
 import Store from 'electron-store'
-import type { PreferencesData } from '../../shared/types/ipc'
+import type { PreferencesData, RecentFile } from '../../shared/types/ipc'
+
+const MAX_RECENT = 10
 
 const defaults: PreferencesData = {
   general: {
@@ -35,5 +37,17 @@ export const PreferencesStore = {
 
   setTranslatorSetting(prefix: string, key: string, value: string): void {
     store.set(`${prefix}.${key}`, value)
+  },
+
+  // Recent files
+  getRecentFiles(): RecentFile[] {
+    return store.get('recentFiles', []) as RecentFile[]
+  },
+
+  pushRecentFile(entry: RecentFile): void {
+    const existing: RecentFile[] = store.get('recentFiles', []) as RecentFile[]
+    // Remove duplicates of same filePath, prepend newest
+    const filtered = existing.filter((f) => f.filePath !== entry.filePath)
+    store.set('recentFiles', [entry, ...filtered].slice(0, MAX_RECENT))
   }
 }
