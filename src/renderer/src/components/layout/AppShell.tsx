@@ -8,7 +8,7 @@ import { StatusBar } from './StatusBar'
 import { PreferencesPage } from '../dialogs/PreferencesDialog'
 import { api } from '../../lib/api'
 import { Button } from '../ui/button'
-import { DropdownMenu, DropdownItem, DropdownSeparator } from '../ui/dropdown'
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '../ui/dropdown-menu'
 import type { RecentFile } from '../../../../shared/types/ipc'
 import { FolderOpen, Save, Settings, Clock, ChevronRight } from 'lucide-react'
 import { validatePlaceholders } from '../../../../shared/utils/validatePlaceholders'
@@ -116,25 +116,25 @@ export function AppShell() {
               }
             >
               {recentFiles.length === 0 ? (
-                <DropdownItem disabled>No recent files</DropdownItem>
+                <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
               ) : (
                 recentFiles.map((f) => (
-                  <DropdownItem key={f.filePath} onClick={() => handleOpenRecent(f.filePath)}>
+                  <DropdownMenuItem key={f.filePath} onClick={() => handleOpenRecent(f.filePath)}>
                     <div className="flex flex-col">
                       <span className="font-medium text-xs">{basename(f.filePath)}</span>
                       <span className="text-xs text-muted-foreground truncate max-w-[280px]">
                         {f.filePath}
                       </span>
                     </div>
-                  </DropdownItem>
+                  </DropdownMenuItem>
                 ))
               )}
               {recentFiles.length > 0 && (
                 <>
-                  <DropdownSeparator />
-                  <DropdownItem onClick={handleOpen} className="text-muted-foreground">
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleOpen} className="text-muted-foreground">
                     Browse…
-                  </DropdownItem>
+                  </DropdownMenuItem>
                 </>
               )}
             </DropdownMenu>
