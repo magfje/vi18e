@@ -15,14 +15,14 @@ import { computeStats } from "../../shared/types/catalog"
 import { PreferencesStore } from "../store/PreferencesStore"
 
 // ---------------------------------------------------------------------------
-// Auto-detection helpers for Format.js JSON files
+// Auto-detection helpers for JSON translation files
 // ---------------------------------------------------------------------------
 
 /**
- * Preferred source-file names, in priority order.
- * The first one found in the same directory wins.
+ * Preferred source-locale filenames, in priority order.
+ * Any of these found as a sibling will be used as the reference file.
  */
-const SOURCE_CANDIDATES = [
+const SOURCE_LOCALE_NAMES = [
   'en.json',
   'en-US.json',
   'en_US.json',
@@ -32,29 +32,63 @@ const SOURCE_CANDIDATES = [
 ]
 
 /**
- * Infer BCP-47 language code from a filename like "nb.json", "fr-FR.json", "zh_CN.json".
- * Returns undefined if the basename doesn't look like a language tag.
+ * Infer a BCP-47 language code from a filename like:
+ *   nb.json → "nb"
+ *   fr-FR.json → "fr-FR"
+ *   zh_CN.json → "zh-CN"   (underscore normalised to hyphen)
+ * Returns undefined if the filename doesn't look like a locale tag.
  */
 function inferLanguage(filePath: string): string | undefined {
   const base = basename(filePath, extname(filePath))
-  // Match: xx  /  xx-YY  /  xx_YY
-  if (/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/.test(base) || /^[a-z]{2,3}_[A-Za-z]{2,4}$/.test(base)) {
+  // Match: xx  /  xxx  /  xx-YY  /  xxx-YY  /  xx_YY  /  xxx_YY
+  if (
+    /^[a-z]{2,3}$/.test(base) ||
+    /^[a-z]{2,3}[-_][A-Za-z]{2,4}$/.test(base)
+  ) {
     return base.replace('_', '-')
   }
   return undefined
 }
 
 /**
- * Return true if `filePath` is a Format.js source file —
- * i.e. its JSON values are objects with a "defaultMessage" key.
- * Reads only enough to check the first entry.
+ * Return true when the filename (case-insensitive) matches one of the known
+ * source-locale names.  Used to avoid treating en.json as a translation file
+ * when the user explicitly opens it.
  */
-async function isFormatJsSourceFile(filePath: string): Promise<boolean> {
+function looksLikeSourceLocale(filePath: string): boolean {
+  const name = basename(filePath).toLowerCase()
+  return SOURCE_LOCALE_NAMES.map((n) => n.toLowerCase()).includes(name)
+}
+
+/**
+ * Return true when the file is valid JSON whose values are mostly plain strings.
+ * This covers both flat-string translation files AND the flat-string source locale
+ * (the user's en.json).  Does NOT require defaultMessage objects.
+ */
+async function isFlatStringJson(filePath: string): Promise<boolean> {
   try {
     const raw = await readFile(filePath, 'utf-8')
     const data = JSON.parse(raw) as Record<string, unknown>
     const values = Object.values(data)
-    // Need at least one entry that looks like { defaultMessage: "..." }
+    if (values.length === 0) return false
+    const stringCount = values.filter((v) => typeof v === 'string').length
+    return stringCount / values.length >= 0.8
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Return true when the file looks like a Format.js *extraction* source —
+ * i.e. values are objects with a "defaultMessage" string property.
+ * This is the older/alternative workflow where you use the extraction output
+ * as the reference instead of a plain locale file.
+ */
+async function isDefaultMessageJson(filePath: string): Promise<boolean> {
+  try {
+    const raw = await readFile(filePath, 'utf-8')
+    const data = JSON.parse(raw) as Record<string, unknown>
+    const values = Object.values(data)
     return values
       .slice(0, 10)
       .some(
@@ -70,71 +104,51 @@ async function isFormatJsSourceFile(filePath: string): Promise<boolean> {
 }
 
 /**
- * Return true if `filePath` is a Format.js *translation* file —
- * i.e. its JSON values are plain strings (not source-file objects).
- */
-async function isFormatJsTranslationFile(filePath: string): Promise<boolean> {
-  try {
-    const raw = await readFile(filePath, 'utf-8')
-    const data = JSON.parse(raw) as Record<string, unknown>
-    const values = Object.values(data)
-    if (values.length === 0) return false
-    // Must have at least some string values
-    const stringCount = values.filter((v) => typeof v === 'string').length
-    return stringCount / values.length > 0.5
-  } catch {
-    return false
-  }
-}
-
-/**
- * Given a JSON file path, try to find its Format.js source/reference file.
+ * Given a JSON file, resolve the best reference/source file and infer languages.
  *
- * Strategy:
- *  1. If the file itself is a source file (has defaultMessage) → no reference needed,
- *     but we also try to find a sibling translation file to be aware of.
- *  2. If the file is a translation file → scan sibling JSON files for the source.
- *     Preferred names: en.json, en-US.json, …
- *     Fall back to any sibling that isFormatJsSourceFile().
+ * Two reference-file formats are supported:
+ *  A) Flat locale files  (user's setup):   { "key": "English string" }
+ *  B) Extraction output  (older workflow):  { "key": { "defaultMessage": "..." } }
  *
- * Returns an enriched OpenFileRequest with referenceFilePath / languages filled in.
+ * Detection order for the reference:
+ *  1. If the opened file itself is in SOURCE_LOCALE_NAMES — it IS the source,
+ *     no companion needed (infer source language from filename).
+ *  2. Look for a sibling in SOURCE_LOCALE_NAMES that is flat-string JSON (format A).
+ *  3. Look for any sibling that is defaultMessage JSON (format B).
+ *  4. Give up — at least infer the target language from the filename.
  */
 async function autoDetectJsonContext(req: OpenFileRequest): Promise<OpenFileRequest> {
   const { filePath } = req
 
-  // Don't override an explicit referenceFilePath
+  // Don't override an explicit referenceFilePath provided by the caller
   if (req.referenceFilePath) return req
 
-  const dir = dirname(filePath)
   const targetLang = inferLanguage(filePath)
 
-  // Is the opened file itself a source file?
-  if (await isFormatJsSourceFile(filePath)) {
-    // Opened the source (en.json) directly — no reference needed.
-    // Infer source language from filename and return.
+  // Case 1 — the opened file IS the source locale (user opened en.json directly)
+  if (looksLikeSourceLocale(filePath)) {
     return {
       ...req,
-      sourceLanguage: req.sourceLanguage ?? targetLang ?? 'en',
-      // no referenceFilePath — the plugin handles defaultMessage values inline
+      sourceLanguage: req.sourceLanguage ?? targetLang ?? 'en'
     }
   }
 
-  // It looks like a translation file — search for the source file.
+  // Case 2 & 3 — scan sibling JSON files for a reference
+  const dir = dirname(filePath)
   let siblings: string[]
   try {
-    const entries = await readdir(dir)
-    siblings = entries.filter((f) => f.toLowerCase().endsWith('.json'))
+    siblings = (await readdir(dir)).filter((f) => f.toLowerCase().endsWith('.json'))
   } catch {
-    return req
+    return { ...req, targetLanguage: req.targetLanguage ?? targetLang }
   }
 
-  // 1. Check preferred candidate names first (case-insensitive)
-  for (const candidate of SOURCE_CANDIDATES) {
+  // Priority A: a sibling whose name matches a known source-locale name (flat strings)
+  for (const candidate of SOURCE_LOCALE_NAMES) {
     const match = siblings.find((s) => s.toLowerCase() === candidate.toLowerCase())
     if (!match) continue
     const candidatePath = join(dir, match)
     if (candidatePath === filePath) continue
-    if (await isFormatJsSourceFile(candidatePath)) {
+    if (await isFlatStringJson(candidatePath)) {
       return {
         ...req,
         referenceFilePath: candidatePath,
@@ -144,11 +158,11 @@ async function autoDetectJsonContext(req: OpenFileRequest): Promise<OpenFileRequ
     }
   }
 
-  // 2. Fall back: any sibling that is a source file
+  // Priority B: any sibling with defaultMessage objects (extraction format)
   for (const sibling of siblings) {
     const candidatePath = join(dir, sibling)
     if (candidatePath === filePath) continue
-    if (await isFormatJsSourceFile(candidatePath)) {
+    if (await isDefaultMessageJson(candidatePath)) {
       return {
         ...req,
         referenceFilePath: candidatePath,
@@ -158,11 +172,8 @@ async function autoDetectJsonContext(req: OpenFileRequest): Promise<OpenFileRequ
     }
   }
 
-  // 3. No source file found — at least fill in the language from the filename
-  return {
-    ...req,
-    targetLanguage: req.targetLanguage ?? targetLang
-  }
+  // No reference found — at least record the target language
+  return { ...req, targetLanguage: req.targetLanguage ?? targetLang }
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +204,7 @@ export function registerFileHandlers(): void {
         return { error: `No plugin found for file: ${req.filePath}` } satisfies OpenFileResponse
       }
 
-      // Auto-detect companion source file for Format.js JSON files
+      // Auto-detect companion source file for JSON files
       const enrichedReq =
         plugin.id === 'formatjs-json'
           ? await autoDetectJsonContext(req)
