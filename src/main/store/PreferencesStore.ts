@@ -7,7 +7,8 @@ const defaults: PreferencesData = {
   general: {
     defaultSourceLanguage: 'en',
     defaultTargetLanguage: '',
-    autoFetchSuggestions: true
+    autoFetchSuggestions: true,
+    theme: 'system'
   },
   translators: {}
 }

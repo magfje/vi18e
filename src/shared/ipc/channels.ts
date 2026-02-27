@@ -25,6 +25,7 @@ export const IPC = {
   // Translator plugins
   TRANSLATE_QUERY: 'translate:query',
   TRANSLATE_AVAILABLE: 'translate:available',
+  TRANSLATE_USAGE: 'translate:usage',
 
   // Preferences
   PREFS_GET: 'prefs:get',

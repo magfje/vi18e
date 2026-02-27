@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import type { CatalogItem } from '../../../../shared/types/catalog'
 import { cn } from '../../lib/utils'
 import { Badge } from '../ui/badge'
+import { AlertTriangle } from 'lucide-react'
+import { validatePlaceholders } from '../../../../shared/utils/validatePlaceholders'
 
 interface EditingAreaProps {
   item: CatalogItem | null
@@ -32,7 +34,15 @@ export function EditingArea({
     setLocalTranslations(filled)
     setLocalComment(item?.comment ?? '')
     setActivePluralTab(0)
-  }, [item?.id])
+    // Deps include translations join so that applying a suggestion (which updates
+    // the store directly) causes this effect to re-run and the textarea to update.
+  }, [item?.id, item?.translations?.join('\x00')])
+
+  // Validate placeholder consistency in real-time (from local textarea state, before blur)
+  const placeholderValidation = useMemo(() => {
+    if (!item?.source || !localTranslations[0]?.trim()) return null
+    return validatePlaceholders(item.source, localTranslations[0])
+  }, [item?.source, localTranslations[0]])
 
   if (!item) {
     return (
@@ -147,6 +157,39 @@ export function EditingArea({
             placeholder={activePluralTab === 0 ? 'Singular form…' : `Plural form ${activePluralTab + 1}…`}
             className="flex-1 min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
           />
+        )}
+
+        {/* Placeholder mismatch warning */}
+        {placeholderValidation?.hasIssue && (
+          <div className="flex gap-1.5 items-start text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5 mt-1">
+            <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-px" />
+            <div>
+              <span className="font-medium">Placeholder mismatch</span>
+              {placeholderValidation.missing.length > 0 && (
+                <span>
+                  {' — '}missing:{' '}
+                  {placeholderValidation.missing.map((v, i) => (
+                    <React.Fragment key={v}>
+                      {i > 0 && ', '}
+                      <code className="bg-amber-100 dark:bg-amber-900 rounded px-0.5 font-mono">{`{${v}}`}</code>
+                    </React.Fragment>
+                  ))}
+                </span>
+              )}
+              {placeholderValidation.extra.length > 0 && (
+                <span>
+                  {placeholderValidation.missing.length > 0 ? ' · ' : ' — '}
+                  unexpected:{' '}
+                  {placeholderValidation.extra.map((v, i) => (
+                    <React.Fragment key={v}>
+                      {i > 0 && ', '}
+                      <code className="bg-amber-100 dark:bg-amber-900 rounded px-0.5 font-mono">{`{${v}}`}</code>
+                    </React.Fragment>
+                  ))}
+                </span>
+              )}
+            </div>
+          </div>
         )}
       </div>
 

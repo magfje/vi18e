@@ -1,37 +1,89 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { CatalogItem, ItemStatus } from '../../../../shared/types/catalog'
 import { CatalogListItem } from './CatalogListItem'
 import { cn } from '../../lib/utils'
+import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 
 interface CatalogListProps {
   items: CatalogItem[]
   selectedId: number | null
   onSelect: (id: number) => void
+  /** Increment this to trigger a re-sort (e.g. after save) */
+  resortTrigger?: number
 }
 
 type FilterMode = 'all' | ItemStatus
+type SortColumn = 'status' | 'source' | 'translation'
+type SortDir = 'asc' | 'desc'
 
-export function CatalogList({ items, selectedId, onSelect }: CatalogListProps) {
+function statusRank(status: string): number {
+  if (status === 'untranslated') return 0
+  if (status === 'fuzzy') return 1
+  return 2
+}
+
+export function CatalogList({ items, selectedId, onSelect, resortTrigger }: CatalogListProps) {
   const [filter, setFilter] = useState<FilterMode>('all')
   const [search, setSearch] = useState('')
+  const [sortCol, setSortCol] = useState<SortColumn>('status')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
   const parentRef = useRef<HTMLDivElement>(null)
 
-  const filtered = items.filter((item) => {
-    if (filter !== 'all' && item.status !== filter) return false
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      return (
-        item.source.toLowerCase().includes(q) ||
-        item.msgid.toLowerCase().includes(q) ||
-        item.translations[0]?.toLowerCase().includes(q)
-      )
+  // Stable sorted IDs — only recomputed when sort/filter/search params change,
+  // or when the loaded file changes (different item IDs). Editing item content
+  // (status, translations) does NOT move items around until the next re-sort.
+  const [stableSortedIds, setStableSortedIds] = useState<number[]>([])
+  // Signature of the current item set — changes only when items are added/removed
+  const itemIdSignature = items.map((i) => i.id).join(',')
+
+  useEffect(() => {
+    const filtered = items.filter((item) => {
+      if (filter !== 'all' && item.status !== filter) return false
+      if (search.trim()) {
+        const q = search.toLowerCase()
+        return (
+          item.source.toLowerCase().includes(q) ||
+          item.msgid.toLowerCase().includes(q) ||
+          item.translations[0]?.toLowerCase().includes(q)
+        )
+      }
+      return true
+    })
+
+    const sorted = [...filtered].sort((a, b) => {
+      let cmp = 0
+      if (sortCol === 'status') {
+        cmp = statusRank(a.status) - statusRank(b.status)
+        if (cmp === 0) cmp = a.id - b.id
+      } else if (sortCol === 'source') {
+        cmp = a.source.localeCompare(b.source)
+      } else if (sortCol === 'translation') {
+        cmp = (a.translations[0] ?? '').localeCompare(b.translations[0] ?? '')
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+
+    setStableSortedIds(sorted.map((i) => i.id))
+  }, [itemIdSignature, sortCol, sortDir, filter, search, resortTrigger])
+
+  // Look up live item data (for up-to-date content/status display) using the stable order
+  const itemMap = new Map(items.map((i) => [i.id, i]))
+  const displayItems = stableSortedIds
+    .map((id) => itemMap.get(id))
+    .filter((i): i is CatalogItem => i !== undefined)
+
+  const handleSortClick = (col: SortColumn) => {
+    if (sortCol === col) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortCol(col)
+      setSortDir('asc')
     }
-    return true
-  })
+  }
 
   const virtualizer = useVirtualizer({
-    count: filtered.length,
+    count: displayItems.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 44,
     overscan: 5
@@ -75,12 +127,31 @@ export function CatalogList({ items, selectedId, onSelect }: CatalogListProps) {
         />
       </div>
 
-      {/* Column headers */}
-      <div className="flex items-center gap-3 px-3 py-1 text-xs font-medium text-muted-foreground border-b border-border bg-muted/30 flex-shrink-0">
-        <span className="w-2 flex-shrink-0" />
-        <div className="flex-1 grid grid-cols-2 gap-2">
-          <span>Source</span>
-          <span>Translation</span>
+      {/* Sortable column headers */}
+      <div className="flex items-center gap-3 px-3 py-1 text-xs font-medium text-muted-foreground border-b border-border bg-muted/30 flex-shrink-0 select-none">
+        <SortHeader
+          col="status"
+          label="St"
+          sortCol={sortCol}
+          sortDir={sortDir}
+          onSort={handleSortClick}
+          className="w-5 flex-shrink-0"
+        />
+        <div className="flex-1 grid grid-cols-2 gap-2 min-w-0">
+          <SortHeader
+            col="source"
+            label="Source"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={handleSortClick}
+          />
+          <SortHeader
+            col="translation"
+            label="Translation"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={handleSortClick}
+          />
         </div>
       </div>
 
@@ -88,7 +159,7 @@ export function CatalogList({ items, selectedId, onSelect }: CatalogListProps) {
       <div ref={parentRef} className="flex-1 overflow-auto">
         <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
           {virtualizer.getVirtualItems().map((vRow) => {
-            const item = filtered[vRow.index]
+            const item = displayItems[vRow.index]
             return (
               <div
                 key={item.id}
@@ -113,8 +184,42 @@ export function CatalogList({ items, selectedId, onSelect }: CatalogListProps) {
 
       {/* Count */}
       <div className="px-3 py-1 text-xs text-muted-foreground border-t border-border flex-shrink-0">
-        {filtered.length} of {items.length} entries
+        {displayItems.length} of {items.length} entries
       </div>
     </div>
+  )
+}
+
+interface SortHeaderProps {
+  col: SortColumn
+  label: string
+  sortCol: SortColumn
+  sortDir: SortDir
+  onSort: (col: SortColumn) => void
+  className?: string
+}
+
+function SortHeader({ col, label, sortCol, sortDir, onSort, className }: SortHeaderProps) {
+  const isActive = sortCol === col
+  return (
+    <button
+      onClick={() => onSort(col)}
+      className={cn(
+        'flex items-center gap-0.5 hover:text-foreground transition-colors',
+        isActive ? 'text-foreground' : '',
+        className
+      )}
+    >
+      <span>{label}</span>
+      {isActive ? (
+        sortDir === 'asc' ? (
+          <ChevronUp className="h-3 w-3" />
+        ) : (
+          <ChevronDown className="h-3 w-3" />
+        )
+      ) : (
+        <ChevronsUpDown className="h-3 w-3 opacity-40" />
+      )}
+    </button>
   )
 }

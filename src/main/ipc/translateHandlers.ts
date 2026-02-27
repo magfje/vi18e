@@ -47,4 +47,10 @@ export function registerTranslateHandlers(): void {
       plugins: available.map((p) => ({ id: p.id, displayName: p.displayName }))
     } satisfies AvailableTranslatorsResponse
   })
+
+  ipcMain.handle(IPC.TRANSLATE_USAGE, async () => {
+    const deepl = registry.translators.find((p) => p.id === 'deepl')
+    if (!deepl?.getUsage) return null
+    return deepl.getUsage()
+  })
 }

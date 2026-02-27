@@ -34,7 +34,12 @@ export function SuggestionCard({ suggestion, index, onApply, onDelete }: Suggest
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm truncate">{suggestion.text}</p>
+          <p
+            className="text-sm overflow-hidden"
+            style={{ lineHeight: '1.45', maxHeight: 'calc(1.45em * 3)' }}
+          >
+            {suggestion.text}
+          </p>
           <div className="flex items-center gap-2 mt-1">
             <span className={cn('text-xs font-medium', scoreColor)}>{scoreLabel}</span>
             {suggestion.score > 0 && suggestion.score < 1 && (

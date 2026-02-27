@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { Catalog, CatalogItem } from '../../../shared/types/catalog'
 import { computeStats, makeItem } from '../../../shared/types/catalog'
+import { validatePlaceholders, placeholderIssueMessage } from '../../../shared/utils/validatePlaceholders'
 import { api } from '../lib/api'
 
 interface CatalogState {
@@ -54,7 +55,11 @@ export const useCatalogStore = create<CatalogState>()(
       if (!catalog) return false
       const resp = await api.file.save({ catalog })
       if (resp.success) {
-        set((s) => { s.isDirty = false })
+        set((s) => {
+          s.isDirty = false
+          // Clear per-item modified flags now that the file is saved
+          s.catalog?.items.forEach((item) => { item.isModified = false })
+        })
         // Import into TM
         await api.tm.import({ catalog })
       }
@@ -73,6 +78,15 @@ export const useCatalogStore = create<CatalogState>()(
         item.isTranslated = hasText && !item.isFuzzy
         item.status = item.isFuzzy ? 'fuzzy' : hasText ? 'translated' : 'untranslated'
         item.isModified = true
+        // Validate placeholders — flag if translation has wrong/missing {vars}
+        if (hasText) {
+          const pv = validatePlaceholders(item.source, translations[0])
+          item.issue = pv.hasIssue
+            ? { severity: 'warning', message: placeholderIssueMessage(pv) }
+            : undefined
+        } else {
+          item.issue = undefined
+        }
         s.catalog.stats = computeStats(s.catalog.items)
         s.isDirty = true
       }),

@@ -16,6 +16,7 @@ import type {
   TranslateRequest,
   TranslateResponse,
   AvailableTranslatorsResponse,
+  DeepLUsageResponse,
   PreferencesData,
   RecentFile
 } from '../../../shared/types/ipc'
@@ -62,7 +63,9 @@ export const api = {
     query: (req: TranslateRequest) =>
       window.api.invoke<TranslateResponse>(IPC.TRANSLATE_QUERY, req),
     available: () =>
-      window.api.invoke<AvailableTranslatorsResponse>(IPC.TRANSLATE_AVAILABLE)
+      window.api.invoke<AvailableTranslatorsResponse>(IPC.TRANSLATE_AVAILABLE),
+    usage: () =>
+      window.api.invoke<DeepLUsageResponse | null>(IPC.TRANSLATE_USAGE)
   },
 
   prefs: {

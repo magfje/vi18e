@@ -129,6 +129,12 @@ export interface TranslatorPlugin {
    */
   suggest(query: TranslationQuery): Promise<Suggestion[]>
 
+  /**
+   * Optional: return API usage (e.g. character quota).
+   * Returns null if unavailable or not supported.
+   */
+  getUsage?(): Promise<{ characterCount: number; characterLimit: number } | null>
+
   /** Optional: called when the user accepts a suggestion */
   onSuggestionAccepted?(suggestion: Suggestion, query: TranslationQuery): void
 }

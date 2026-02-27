@@ -110,6 +110,11 @@ export interface AvailableTranslatorsResponse {
   plugins: Array<{ id: string; displayName: string }>
 }
 
+export interface DeepLUsageResponse {
+  characterCount: number
+  characterLimit: number
+}
+
 // ---------------------------------------------------------------------------
 // Preferences
 // ---------------------------------------------------------------------------
@@ -120,10 +125,13 @@ export interface TranslatorSettings {
   [key: string]: string | undefined
 }
 
+export type AppTheme = 'light' | 'dark' | 'system'
+
 export interface GeneralSettings {
   defaultSourceLanguage: string
   defaultTargetLanguage: string
   autoFetchSuggestions: boolean
+  theme: AppTheme
 }
 
 export interface PreferencesData {
