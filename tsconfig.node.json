@@ -12,5 +12,5 @@
       "@shared/*": ["./src/shared/*"]
     }
   },
-  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"]
+  "include": ["tsdown.config.*", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"]
 }
