@@ -66,6 +66,11 @@ export class DeepLPlugin implements TranslatorPlugin {
     const srcLang = toDeepLSourceCode(query.sourceLanguage) as deepl.SourceLanguageCode
     const tgtLang = toDeepLTargetCode(query.targetLanguage) as deepl.TargetLanguageCode
 
+    if (!tgtLang.trim()) {
+      console.warn('[DeepLPlugin] suggest: skipped — target language is empty (set a default in Preferences → General)')
+      return []
+    }
+
     console.log(`[DeepLPlugin] translating: ${srcLang} → ${tgtLang}  formality=${formality}`)
 
     try {

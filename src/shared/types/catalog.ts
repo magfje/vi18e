@@ -33,6 +33,12 @@ export interface CatalogItem {
   extractedComments: string[]
   /** Raw flag strings e.g. ["fuzzy", "c-format"] */
   flags: string[]
+  /**
+   * Source-file references extracted from `#:` lines in PO files.
+   * Each element is a single `file:line` token, e.g. `"applications/auth/models.py:42"`.
+   * Empty for non-Gettext formats.
+   */
+  references: string[]
   isFuzzy: boolean
   isTranslated: boolean
   isModified: boolean

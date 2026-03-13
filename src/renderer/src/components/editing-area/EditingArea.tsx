@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { CatalogItem } from '../../../../shared/types/catalog'
 import { cn } from '../../lib/utils'
 import { Badge } from '../ui/badge'
@@ -97,6 +97,9 @@ export function EditingArea({
             {item.extractedComments.join(' · ')}
           </p>
         )}
+        {item.references.length > 0 && (
+          <ReferencesPopover references={item.references} />
+        )}
       </div>
 
       {/* Translation input */}
@@ -171,7 +174,7 @@ export function EditingArea({
                   {placeholderValidation.missing.map((v, i) => (
                     <React.Fragment key={v}>
                       {i > 0 && ', '}
-                      <code className="bg-amber-100 dark:bg-amber-900 rounded px-0.5 font-mono">{`{${v}}`}</code>
+                      <PlaceholderChip token={v} variant="amber" />
                     </React.Fragment>
                   ))}
                 </span>
@@ -183,7 +186,7 @@ export function EditingArea({
                   {placeholderValidation.extra.map((v, i) => (
                     <React.Fragment key={v}>
                       {i > 0 && ', '}
-                      <code className="bg-amber-100 dark:bg-amber-900 rounded px-0.5 font-mono">{`{${v}}`}</code>
+                      <PlaceholderChip token={v} variant="amber" />
                     </React.Fragment>
                   ))}
                 </span>
@@ -211,20 +214,214 @@ export function EditingArea({
   )
 }
 
-/** Highlight Format.js / ICU placeholders like {name}, #, <b> */
+// ---------------------------------------------------------------------------
+// References popover
+// ---------------------------------------------------------------------------
+
+/**
+ * Shows a "N references" trigger that reveals all source-file:line references
+ * on hover. Uses a portal-free approach: the popover is positioned relative
+ * to its own wrapper, which works because the source section is near the top
+ * of the editing area and the popover opens downward over the textarea.
+ */
+function ReferencesPopover({ references }: { references: string[] }) {
+  const [open, setOpen] = useState(false)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const show = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    setOpen(true)
+  }
+  // Small delay on leave so the user can move the mouse onto the popover itself
+  const hide = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 80)
+  }
+
+  const label =
+    references.length === 1 ? '1 reference' : `${references.length} references`
+
+  return (
+    <div className="relative inline-block mt-1" onMouseEnter={show} onMouseLeave={hide}>
+      <span className="text-xs text-muted-foreground cursor-default select-none underline underline-offset-2 decoration-dotted">
+        {label}
+      </span>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1 z-50 w-96 max-h-56 overflow-y-auto bg-popover border border-border shadow-md p-2"
+          onMouseEnter={show}
+          onMouseLeave={hide}
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+            Used in
+          </p>
+          <div className="space-y-0.5">
+            {references.map((ref, i) => (
+              <p key={i} className="text-xs font-mono text-foreground truncate" title={ref}>
+                {ref}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Placeholder chip helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Printf format specifier characters we recognise.
+ * Kept in sync with validatePlaceholders.ts.
+ */
+const PRINTF_SPECS = 'diouxXeEfFgGcrsabu'
+
+/**
+ * Splits text into alternating [plain, token, plain, token, …] segments.
+ *
+ * Recognised token types (in priority order inside the alternation):
+ *   ICU simple        {name}
+ *   ICU complex       {count, plural, one {# item} other {# items}}
+ *                     (one level of nested braces — covers all real-world cases)
+ *   Python-named      %(name)s  %(date)d
+ *   Printf numbered   %1$s  %2$d
+ *   Printf positional %s  %d  (skips %% via negative lookbehind)
+ *   HTML/XML tag      <b>  </b>
+ *   ICU plural marker #
+ */
+const PLACEHOLDER_SPLIT_RE = new RegExp(
+  `(` +
+  // ICU: simple {name} OR complex {count, plural, one {…} other {…}}
+  // The inner alternation (?:[^{}]|\{[^{}]*\})* handles one level of nesting,
+  // which covers all plural/select/selectordinal forms in practice.
+  `\\{[a-zA-Z_$][a-zA-Z0-9_$]*(?:[^{}]|\\{[^{}]*\\})*\\}` +
+  `|%\\([a-zA-Z_][a-zA-Z0-9_]*\\)[${PRINTF_SPECS}]` +   // %(name)s
+  `|%\\d+\\$[${PRINTF_SPECS}]` +                         // %1$s
+  `|(?<!%)%[${PRINTF_SPECS}]` +                          // %s (not preceded by %)
+  `|<[^>]+>` +                                           // <tag>
+  `|#` +                                                 // plural #
+  `)`,
+  'g'
+)
+
+/** Tests whether a split segment is ANY recognised placeholder token. */
+const PLACEHOLDER_IS_RE = new RegExp(
+  `^(` +
+  `\\{[a-zA-Z_$][a-zA-Z0-9_$]*(?:[^{}]|\\{[^{}]*\\})*\\}` + // ICU (simple or complex)
+  `|%\\([a-zA-Z_][a-zA-Z0-9_]*\\)[${PRINTF_SPECS}]` +
+  `|%\\d+\\$[${PRINTF_SPECS}]` +
+  `|%[${PRINTF_SPECS}]` +
+  `|<[^>]+>` +
+  `|#` +
+  `)$`
+)
+
+/** Matches a complex ICU expression: {varName, keyword, …} */
+const COMPLEX_ICU_RE = /^\{([a-zA-Z_$][a-zA-Z0-9_$]*)\s*,\s*([a-zA-Z]+)/
+
+/** Matches a case clause inside a complex ICU: selector { content } */
+const ICU_CASE_RE = /\b(zero|one|two|few|many|other|=\d+)\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g
+
+/** Inline chip for a single placeholder token */
+function PlaceholderChip({
+  token,
+  title,
+  variant = 'blue'
+}: {
+  token: string
+  title?: string
+  variant?: 'blue' | 'amber'
+}) {
+  const cls =
+    variant === 'amber'
+      ? 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded px-0.5 text-xs font-mono'
+      : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded px-0.5 text-xs font-mono'
+  return <code className={cls} title={title}>{token}</code>
+}
+
+/**
+ * Renders a complex ICU plural/select expression with structural parts in blue
+ * and the translatable text content inside each case in amber — so translators
+ * can immediately see which portions need to change.
+ *
+ * {hours, plural, one {# hour} other {# hours}}
+ *  ─── blue ───────────────────────────────────
+ *                       ─amber─        ─amber──
+ */
+function ComplexIcuDisplay({ expression }: { expression: string }) {
+  // Extract the header: "{varName, type, "
+  const headerMatch = expression.match(/^\{([a-zA-Z_$][a-zA-Z0-9_$]*)\s*,\s*([a-zA-Z]+)\s*,\s*/)
+  if (!headerMatch) {
+    // Can't parse — render as plain mono block (should not normally happen)
+    return (
+      <code className="bg-blue-50 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200 rounded border border-blue-200 dark:border-blue-700/60 px-0.5 text-xs font-mono whitespace-normal break-words">
+        {expression}
+      </code>
+    )
+  }
+
+  // inner = everything between the header and the outer closing "}"
+  const inner = expression.slice(headerMatch[0].length, expression.length - 1)
+
+  // Parse each case clause
+  const cases: Array<{ selector: string; content: string }> = []
+  let m: RegExpExecArray | null
+  ICU_CASE_RE.lastIndex = 0
+  while ((m = ICU_CASE_RE.exec(inner)) !== null) {
+    cases.push({ selector: m[1], content: m[2] })
+  }
+
+  if (cases.length === 0) {
+    // Couldn't parse cases — fall back to plain display
+    return (
+      <code className="bg-blue-50 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200 rounded border border-blue-200 dark:border-blue-700/60 px-0.5 text-xs font-mono whitespace-normal break-words">
+        {expression}
+      </code>
+    )
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-0 rounded border border-blue-200 dark:border-blue-700/60 bg-blue-50 dark:bg-blue-950/50 text-xs font-mono px-1 py-px leading-snug">
+      {/* structural header: {varName, type, */}
+      <span className="text-blue-600 dark:text-blue-400">
+        {'{' + headerMatch[1] + ', ' + headerMatch[2] + ','}
+      </span>
+      {cases.map(({ selector, content }, i) => (
+        <React.Fragment key={i}>
+          {/* case keyword: one / other / =1 … */}
+          <span className="text-blue-500 dark:text-blue-400 mx-1">{selector}</span>
+          <span className="text-blue-600 dark:text-blue-400">{'{'}</span>
+          {/* translatable content — amber so it stands out */}
+          <span className="text-amber-700 dark:text-amber-300">{content}</span>
+          <span className="text-blue-600 dark:text-blue-400">{'}'}</span>
+        </React.Fragment>
+      ))}
+      {/* outer closing brace */}
+      <span className="text-blue-600 dark:text-blue-400">{'}'}</span>
+    </span>
+  )
+}
+
+/**
+ * Renders text with all placeholder tokens highlighted.
+ *
+ * • Simple ICU vars, printf specifiers, HTML tags, `#` → compact blue chip
+ * • Complex ICU plural/select → structured display with blue skeleton and
+ *   amber translatable text so the translator sees exactly what to change
+ */
 function HighlightedText({ text }: { text: string }) {
-  const parts = text.split(/(\{[^}]+\}|<[^>]+>|#)/g)
+  const parts = text.split(PLACEHOLDER_SPLIT_RE)
   return (
     <>
-      {parts.map((part, i) =>
-        /^\{[^}]+\}$|^<[^>]+>$|^#$/.test(part) ? (
-          <code key={i} className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded px-0.5 text-xs font-mono">
-            {part}
-          </code>
-        ) : (
-          <span key={i}>{part}</span>
-        )
-      )}
+      {parts.map((part, i) => {
+        if (!PLACEHOLDER_IS_RE.test(part)) return <span key={i}>{part}</span>
+        if (COMPLEX_ICU_RE.test(part)) {
+          return <ComplexIcuDisplay key={i} expression={part} />
+        }
+        return <PlaceholderChip key={i} token={part} variant="blue" />
+      })}
     </>
   )
 }

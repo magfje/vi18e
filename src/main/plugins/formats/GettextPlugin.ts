@@ -37,6 +37,7 @@ export class GettextPlugin implements FileFormatPlugin {
     // PO parser state
     let comment = ''
     const extractedComments: string[] = []
+    let references: string[] = []
     let flags: string[] = []
     let context = ''
     let msgid = ''
@@ -78,6 +79,7 @@ export class GettextPlugin implements FileFormatPlugin {
           context: context || undefined,
           comment,
           extractedComments: [...extractedComments],
+          references: [...references],
           flags: [...flags],
           isFuzzy,
           isTranslated,
@@ -92,6 +94,7 @@ export class GettextPlugin implements FileFormatPlugin {
     const resetState = () => {
       comment = ''
       extractedComments.length = 0
+      references = []
       flags = []
       context = ''
       msgid = ''
@@ -114,6 +117,13 @@ export class GettextPlugin implements FileFormatPlugin {
 
       if (trimmed.startsWith('#.')) {
         extractedComments.push(trimmed.slice(2).trim())
+        inMsgid = inMsgidPlural = inMsgstr = false
+        continue
+      }
+      if (trimmed.startsWith('#:')) {
+        // One #: line can hold multiple space-separated file:line references
+        const refs = trimmed.slice(2).trim().split(/\s+/).filter(Boolean)
+        references.push(...refs)
         inMsgid = inMsgidPlural = inMsgstr = false
         continue
       }

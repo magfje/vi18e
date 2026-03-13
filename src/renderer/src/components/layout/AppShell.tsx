@@ -70,7 +70,7 @@ export function AppShell() {
     if (problematic.length > 0) {
       const proceed = window.confirm(
         `${problematic.length} translation${problematic.length === 1 ? '' : 's'} have placeholder mismatches` +
-          ` (e.g. variable names like {name} may have been translated).\n\nSave anyway?`
+          ` (e.g. {name}, %(date)s, or %s placeholders may have been mistranslated or dropped).\n\nSave anyway?`
       )
       if (!proceed) return
     }

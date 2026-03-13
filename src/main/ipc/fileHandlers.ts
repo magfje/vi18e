@@ -176,6 +176,32 @@ async function autoDetectJsonContext(req: OpenFileRequest): Promise<OpenFileRequ
   return { ...req, targetLanguage: req.targetLanguage ?? targetLang }
 }
 
+/**
+ * Enrich an OpenFileRequest for Gettext PO/POT files:
+ * - Infer the target language from the filename (e.g. "nb.po" → "nb")
+ * - Fall back to the user's defaultSourceLanguage / defaultTargetLanguage prefs
+ *   when neither the filename nor the caller provided a language.
+ *
+ * Note: GettextPlugin.open() will STILL override targetLanguage with the
+ * file's own `Language:` header when present, so preferences only apply when
+ * the header is missing.
+ */
+function enrichGettextContext(req: OpenFileRequest): OpenFileRequest {
+  const prefs = PreferencesStore.get()
+  return {
+    ...req,
+    sourceLanguage:
+      req.sourceLanguage ??
+      prefs.general.defaultSourceLanguage ??
+      'en',
+    targetLanguage:
+      req.targetLanguage ??
+      inferLanguage(req.filePath) ??
+      prefs.general.defaultTargetLanguage ??
+      ''
+  }
+}
+
 // ---------------------------------------------------------------------------
 // IPC handlers
 // ---------------------------------------------------------------------------
@@ -204,10 +230,12 @@ export function registerFileHandlers(): void {
         return { error: `No plugin found for file: ${req.filePath}` } satisfies OpenFileResponse
       }
 
-      // Auto-detect companion source file for JSON files
+      // Enrich the request with language metadata where possible
       const enrichedReq =
         plugin.id === 'formatjs-json'
           ? await autoDetectJsonContext(req)
+          : plugin.id === 'gettext-po'
+          ? enrichGettextContext(req)
           : req
 
       const catalog = await plugin.open({
