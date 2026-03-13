@@ -29,7 +29,14 @@ export const IPC = {
 
   // Preferences
   PREFS_GET: 'prefs:get',
-  PREFS_SET: 'prefs:set'
+  PREFS_SET: 'prefs:set',
+
+  // Window controls
+  WINDOW_MINIMIZE: 'window:minimize',
+  WINDOW_MAXIMIZE: 'window:maximize',
+  WINDOW_CLOSE: 'window:close',
+  /** ← Push from main when maximize state changes */
+  WINDOW_MAXIMIZED_CHANGED: 'window:maximized-changed'
 } as const
 
 export type IPCChannel = (typeof IPC)[keyof typeof IPC]

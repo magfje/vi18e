@@ -73,5 +73,13 @@ export const api = {
       window.api.invoke<PreferencesData>(IPC.PREFS_GET),
     set: (data: Partial<PreferencesData>) =>
       window.api.invoke<void>(IPC.PREFS_SET, data)
+  },
+
+  win: {
+    minimize: () => window.api.invoke<void>(IPC.WINDOW_MINIMIZE),
+    maximize: () => window.api.invoke<void>(IPC.WINDOW_MAXIMIZE),
+    close: () => window.api.invoke<void>(IPC.WINDOW_CLOSE),
+    onMaximizedChanged: (handler: (isMaximized: boolean) => void) =>
+      window.api.on(IPC.WINDOW_MAXIMIZED_CHANGED, handler as (p: unknown) => void)
   }
 }
