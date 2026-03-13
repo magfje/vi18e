@@ -10,7 +10,7 @@ import { api } from '../../lib/api'
 import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '../ui/dropdown-menu'
 import type { RecentFile } from '../../../../shared/types/ipc'
-import { FolderOpen, Save, Settings, Clock, ChevronRight } from 'lucide-react'
+import { FolderOpen, Save, Settings, Clock, ChevronRight, Minus, Square, X } from 'lucide-react'
 import { validatePlaceholders } from '../../../../shared/utils/validatePlaceholders'
 
 export function AppShell() {
@@ -32,12 +32,18 @@ export function AppShell() {
   const [prefsOpen, setPrefsOpen] = useState(false)
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([])
   const [saveCount, setSaveCount] = useState(0)
+  const [isMaximized, setIsMaximized] = useState(false)
 
   const item = useCatalogStore(selectedItem)
 
   // Load recent files on mount
   useEffect(() => {
     api.file.recentList().then(setRecentFiles).catch(() => {})
+  }, [])
+
+  // Track maximize state
+  useEffect(() => {
+    return api.win.onMaximizedChanged(setIsMaximized)
   }, [])
 
   const handleOpen = async () => {
@@ -96,71 +102,108 @@ export function AppShell() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background flex-shrink-0">
-        <span className="font-semibold text-sm mr-2">Poedit TS</span>
+      {/* Toolbar — draggable titlebar region */}
+      <div
+        className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background flex-shrink-0 select-none"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <span className="font-semibold text-sm mr-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>Poedit TS</span>
 
-        {!prefsOpen && (
-          <>
-            <Button variant="outline" size="sm" onClick={handleOpen}>
-              <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
-              Open
-            </Button>
+        {/* Interactive toolbar buttons must opt out of drag */}
+        <div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          {!prefsOpen && (
+            <>
+              <Button variant="outline" size="sm" onClick={handleOpen}>
+                <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+                Open
+              </Button>
 
-            {/* Recent files dropdown */}
-            <DropdownMenu
-              trigger={
-                <Button variant="ghost" size="sm" title="Recent files">
-                  <Clock className="h-3.5 w-3.5" />
-                </Button>
-              }
-            >
-              {recentFiles.length === 0 ? (
-                <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
-              ) : (
-                recentFiles.map((f) => (
-                  <DropdownMenuItem key={f.filePath} onClick={() => handleOpenRecent(f.filePath)}>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-xs">{basename(f.filePath)}</span>
-                      <span className="text-xs text-muted-foreground truncate max-w-[280px]">
-                        {f.filePath}
-                      </span>
-                    </div>
-                  </DropdownMenuItem>
-                ))
-              )}
-              {recentFiles.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleOpen} className="text-muted-foreground">
-                    Browse…
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenu>
+              {/* Recent files dropdown */}
+              <DropdownMenu
+                trigger={
+                  <Button variant="ghost" size="sm" title="Recent files">
+                    <Clock className="h-3.5 w-3.5" />
+                  </Button>
+                }
+              >
+                {recentFiles.length === 0 ? (
+                  <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
+                ) : (
+                  recentFiles.map((f) => (
+                    <DropdownMenuItem key={f.filePath} onClick={() => handleOpenRecent(f.filePath)}>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-xs">{basename(f.filePath)}</span>
+                        <span className="text-xs text-muted-foreground truncate max-w-[280px]">
+                          {f.filePath}
+                        </span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))
+                )}
+                {recentFiles.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleOpen} className="text-muted-foreground">
+                      Browse…
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenu>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSave}
-              disabled={!catalog || !isDirty}
-            >
-              <Save className="h-3.5 w-3.5 mr-1.5" />
-              Save{isDirty ? ' *' : ''}
-            </Button>
-          </>
-        )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSave}
+                disabled={!catalog || !isDirty}
+              >
+                <Save className="h-3.5 w-3.5 mr-1.5" />
+                Save{isDirty ? ' *' : ''}
+              </Button>
+            </>
+          )}
+        </div>
 
         <div className="flex-1" />
 
-        <Button
-          variant={prefsOpen ? 'secondary' : 'ghost'}
-          size="sm"
-          onClick={() => setPrefsOpen((v) => !v)}
+        {/* Preferences button */}
+        <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <Button
+            variant={prefsOpen ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setPrefsOpen((v) => !v)}
+          >
+            <Settings className="h-3.5 w-3.5 mr-1.5" />
+            Preferences
+          </Button>
+        </div>
+
+        {/* Window controls */}
+        <div
+          className="flex items-center ml-2"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          <Settings className="h-3.5 w-3.5 mr-1.5" />
-          Preferences
-        </Button>
+          <button
+            onClick={() => api.win.minimize()}
+            className="flex items-center justify-center w-10 h-8 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            title="Minimize"
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => api.win.maximize()}
+            className="flex items-center justify-center w-10 h-8 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            title={isMaximized ? 'Restore' : 'Maximize'}
+          >
+            <Square className="h-3 w-3" />
+          </button>
+          <button
+            onClick={() => api.win.close()}
+            className="flex items-center justify-center w-10 h-8 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
+            title="Close"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Error banner */}
