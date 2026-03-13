@@ -11,6 +11,7 @@ interface CatalogListProps {
   onSelect: (id: number) => void
   /** Increment this to trigger a re-sort (e.g. after save) */
   resortTrigger?: number
+  hasFuzzyCapability?: boolean
 }
 
 type FilterMode = 'all' | ItemStatus
@@ -23,7 +24,7 @@ function statusRank(status: string): number {
   return 2
 }
 
-export function CatalogList({ items, selectedId, onSelect, resortTrigger }: CatalogListProps) {
+export function CatalogList({ items, selectedId, onSelect, resortTrigger, hasFuzzyCapability = true }: CatalogListProps) {
   const [filter, setFilter] = useState<FilterMode>('all')
   const [search, setSearch] = useState('')
   const [sortCol, setSortCol] = useState<SortColumn>('status')
@@ -92,7 +93,7 @@ export function CatalogList({ items, selectedId, onSelect, resortTrigger }: Cata
   const tabs: { label: string; value: FilterMode }[] = [
     { label: 'All', value: 'all' },
     { label: 'Untranslated', value: 'untranslated' },
-    { label: 'Fuzzy', value: 'fuzzy' },
+    ...(hasFuzzyCapability ? [{ label: 'Fuzzy', value: 'fuzzy' as FilterMode }] : []),
     { label: 'Translated', value: 'translated' }
   ]
 
@@ -131,7 +132,7 @@ export function CatalogList({ items, selectedId, onSelect, resortTrigger }: Cata
       <div className="flex items-center gap-3 px-3 py-1 text-xs font-medium text-muted-foreground border-b border-border bg-muted/30 flex-shrink-0 select-none">
         <SortHeader
           col="status"
-          label="St"
+          label=""
           sortCol={sortCol}
           sortDir={sortDir}
           onSort={handleSortClick}

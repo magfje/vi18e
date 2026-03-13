@@ -58,7 +58,7 @@ export interface TMQueryRequest {
   sourceText: string
   sourceLanguage: string
   targetLanguage: string
-  /** Max results (default 9 — matches Poedit's SUGGESTIONS_MENU_ENTRIES) */
+  /** Max results (default 9) */
   limit?: number
 }
 

@@ -8,6 +8,7 @@ import { validatePlaceholders } from '../../../../shared/utils/validatePlacehold
 interface EditingAreaProps {
   item: CatalogItem | null
   hasFuzzyCapability: boolean
+  hasCommentCapability: boolean
   onTranslationChange: (translations: string[]) => void
   onFuzzyChange: (fuzzy: boolean) => void
   onCommentChange: (comment: string) => void
@@ -16,6 +17,7 @@ interface EditingAreaProps {
 export function EditingArea({
   item,
   hasFuzzyCapability,
+  hasCommentCapability,
   onTranslationChange,
   onFuzzyChange,
   onCommentChange
@@ -68,7 +70,7 @@ export function EditingArea({
   }
 
   return (
-    <div className="flex flex-col h-full p-3 gap-3 overflow-y-auto">
+    <div className="flex flex-col h-full p-3 gap-3 overflow-y-auto select-none">
       {/* Item header */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <span className="text-xs text-muted-foreground font-mono">#{item.id}</span>
@@ -197,19 +199,21 @@ export function EditingArea({
       </div>
 
       {/* Comment */}
-      <div className="flex-shrink-0">
-        <label className="text-xs font-medium text-muted-foreground mb-1 block">
-          Translator comment
-        </label>
-        <textarea
-          value={localComment}
-          onChange={(e) => setLocalComment(e.target.value)}
-          onBlur={handleCommentBlur}
-          placeholder="Add a note for other translators..."
-          rows={2}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-        />
-      </div>
+      {hasCommentCapability && (
+        <div className="flex-shrink-0">
+          <label className="text-xs font-medium text-muted-foreground mb-1 block">
+            Translator comment
+          </label>
+          <textarea
+            value={localComment}
+            onChange={(e) => setLocalComment(e.target.value)}
+            onBlur={handleCommentBlur}
+            placeholder="Add a note for other translators..."
+            rows={2}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+          />
+        </div>
+      )}
     </div>
   )
 }

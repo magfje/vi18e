@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react'
+import { useHotkeys } from 'react-hotkeys-hook'
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels'
 import { useCatalogStore, selectedItem } from '../../store/catalogStore'
 import { CatalogList } from '../catalog-list/CatalogList'
@@ -8,9 +9,9 @@ import { StatusBar } from './StatusBar'
 import { PreferencesPage } from '../dialogs/PreferencesDialog'
 import { api } from '../../lib/api'
 import { Button } from '../ui/button'
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '../ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuItem } from '../ui/dropdown-menu'
 import type { RecentFile } from '../../../../shared/types/ipc'
-import { FolderOpen, Save, Settings, Clock, ChevronRight, Minus, Square, X } from 'lucide-react'
+import { FolderOpen, Save, Settings, ChevronDown, ChevronRight, Minus, Square, X } from 'lucide-react'
 import { validatePlaceholders } from '../../../../shared/utils/validatePlaceholders'
 
 export function AppShell() {
@@ -45,6 +46,8 @@ export function AppShell() {
   useEffect(() => {
     return api.win.onMaximizedChanged(setIsMaximized)
   }, [])
+
+  useHotkeys('ctrl+s', () => { if (catalog && isDirty) handleSave() }, { enableOnFormTags: true }, [catalog, isDirty])
 
   const handleOpen = async () => {
     const resp = await api.file.openDialog({
@@ -97,8 +100,8 @@ export function AppShell() {
   )
 
   const formatCapabilities = catalog
-    ? { fuzzyTranslations: catalog.formatId === 'gettext-po' }
-    : { fuzzyTranslations: false }
+    ? { fuzzyTranslations: catalog.formatId === 'gettext-po', userComments: catalog.formatId === 'gettext-po' }
+    : { fuzzyTranslations: false, userComments: false }
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
@@ -107,48 +110,48 @@ export function AppShell() {
         className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background flex-shrink-0 select-none"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <span className="font-semibold text-sm mr-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>Poedit TS</span>
+        <span className="font-semibold text-sm mr-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>v(i18)e</span>
 
         {/* Interactive toolbar buttons must opt out of drag */}
         <div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           {!prefsOpen && (
             <>
-              <Button variant="outline" size="sm" onClick={handleOpen}>
-                <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
-                Open
-              </Button>
+              {/* Split open button */}
+              <div className="flex items-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpen}
+                  className="rounded-r-none border-r-0"
+                >
+                  <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+                  Open
+                </Button>
+                <DropdownMenu
+                  align="left"
+                  trigger={
+                    <Button variant="outline" size="sm" className="rounded-l-none px-1.5" title="Recent files">
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
+                  }
+                >
+                  {recentFiles.length === 0 ? (
+                    <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
+                  ) : (
+                    recentFiles.map((f) => (
+                      <DropdownMenuItem key={f.filePath} onClick={() => handleOpenRecent(f.filePath)}>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-xs">{basename(f.filePath)}</span>
+                          <span className="text-xs text-muted-foreground truncate max-w-[280px]">
+                            {f.filePath}
+                          </span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))
+                  )}
 
-              {/* Recent files dropdown */}
-              <DropdownMenu
-                trigger={
-                  <Button variant="ghost" size="sm" title="Recent files">
-                    <Clock className="h-3.5 w-3.5" />
-                  </Button>
-                }
-              >
-                {recentFiles.length === 0 ? (
-                  <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
-                ) : (
-                  recentFiles.map((f) => (
-                    <DropdownMenuItem key={f.filePath} onClick={() => handleOpenRecent(f.filePath)}>
-                      <div className="flex flex-col">
-                        <span className="font-medium text-xs">{basename(f.filePath)}</span>
-                        <span className="text-xs text-muted-foreground truncate max-w-[280px]">
-                          {f.filePath}
-                        </span>
-                      </div>
-                    </DropdownMenuItem>
-                  ))
-                )}
-                {recentFiles.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleOpen} className="text-muted-foreground">
-                      Browse…
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenu>
+                </DropdownMenu>
+              </div>
 
               <Button
                 variant="outline"
@@ -240,6 +243,7 @@ export function AppShell() {
                   selectedId={selectedId}
                   onSelect={selectItem}
                   resortTrigger={saveCount}
+                  hasFuzzyCapability={formatCapabilities.fuzzyTranslations}
                 />
               </Panel>
 
@@ -263,6 +267,7 @@ export function AppShell() {
             <EditingArea
               item={item}
               hasFuzzyCapability={formatCapabilities.fuzzyTranslations}
+              hasCommentCapability={formatCapabilities.userComments}
               onTranslationChange={(translations) => {
                 if (selectedId !== null) updateTranslation(selectedId, translations)
               }}
@@ -311,7 +316,7 @@ function WelcomeScreen({ recentFiles, onOpen, onOpenRecent }: WelcomeScreenProps
       <div className="max-w-xl mx-auto px-8 py-12">
         {/* App title */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold tracking-tight mb-1">Poedit TS</h2>
+          <h2 className="text-2xl font-bold tracking-tight mb-1">v(i18)e</h2>
           <p className="text-muted-foreground text-sm">
             Open a translation file to start editing.
           </p>

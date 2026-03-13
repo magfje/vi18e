@@ -7,7 +7,7 @@ export function baseLanguage(code: string): string {
   return code.split(/[-_]/)[0].toLowerCase()
 }
 
-/** Convert a poedit-style code ("en_US") to uppercase base ("EN") for DeepL source */
+/** Convert a BCP-47 code ("en_US") to uppercase base ("EN") for DeepL source */
 export function toDeepLSourceCode(code: string): string {
   return baseLanguage(code).toUpperCase()
 }

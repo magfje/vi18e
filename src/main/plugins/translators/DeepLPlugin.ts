@@ -2,6 +2,103 @@ import * as deepl from 'deepl-node'
 import type { TranslatorPlugin, TranslationQuery, Suggestion } from '../../../shared/types/plugins'
 import { toDeepLSourceCode, toDeepLTargetCode } from '../../../shared/utils/languages'
 
+// Matches ICU simple/complex, Python-named, printf-numbered, printf-positional placeholders
+const PLACEHOLDER_RE = /\{[a-zA-Z_$][a-zA-Z0-9_$]*(?:[^{}]|\{[^{}]*\})*\}|%\([a-zA-Z_][a-zA-Z0-9_]*\)[diouxXeEfFgGcrsabu]|%\d+\$[diouxXeEfFgGcrsabu]|(?<!%)%[diouxXeEfFgGcrsabu]/g
+
+/** Detects complex ICU (plural / select / selectordinal) that has translatable case text. */
+const COMPLEX_ICU_HEADER_RE = /^\{[^{},]+,\s*(?:plural|select|selectordinal)\s*,/
+
+function protectWhole(match: string, tags: string[]): string {
+  const idx = tags.length
+  tags.push(match)
+  return `<p${idx}/>`
+}
+
+/**
+ * Explode a complex ICU expression so that structural parts become XML tags
+ * (preserved by DeepL) while the case text content stays visible for translation.
+ *
+ * `{count, plural, one{# item} other{# items}}`
+ *   → `<p0/><p1/><p2/> item<p3/> <p4/><p5/> items<p6/><p7/>`
+ *
+ * tags = ['{count, plural, ', 'one{', '#', '}', 'other{', '#', '}', '}']
+ */
+function explodeComplexIcu(match: string, tags: string[]): string {
+  const headerMatch = match.match(/^\{[^{},]+,\s*(?:plural|select|selectordinal)\s*,\s*/)
+  if (!headerMatch) return protectWhole(match, tags)
+
+  const header = headerMatch[0]
+  const headerIdx = tags.length
+  tags.push(header)
+  let result = `<p${headerIdx}/>`
+
+  // Strip header and the outer closing '}'
+  const cases = match.slice(header.length, match.length - 1)
+  let pos = 0
+
+  while (pos < cases.length) {
+    // Pass whitespace between cases through as literal text
+    if (/\s/.test(cases[pos])) {
+      result += cases[pos++]
+      continue
+    }
+
+    const braceIdx = cases.indexOf('{', pos)
+    if (braceIdx < 0) break
+
+    // Protect "caseKey{"
+    const caseOpen = cases.slice(pos, braceIdx + 1) // e.g. "one{" or "other{"
+    const openIdx = tags.length
+    tags.push(caseOpen)
+    result += `<p${openIdx}/>`
+
+    // Find matching closing '}' (depth-aware)
+    let depth = 1
+    let i = braceIdx + 1
+    while (i < cases.length && depth > 0) {
+      if (cases[i] === '{') depth++
+      else if (cases[i] === '}') depth--
+      if (depth > 0) i++
+    }
+    const caseContent = cases.slice(braceIdx + 1, i)
+    pos = i + 1
+
+    // In case content: protect '#' and simple {varName} refs; expose the rest
+    result += caseContent.replace(/#|\{[a-zA-Z_$][a-zA-Z0-9_$]*\}/g, (m) => {
+      const idx = tags.length
+      tags.push(m)
+      return `<p${idx}/>`
+    })
+
+    // Protect closing '}'
+    const closeIdx = tags.length
+    tags.push('}')
+    result += `<p${closeIdx}/>`
+  }
+
+  // Protect the outer closing '}'
+  const outerIdx = tags.length
+  tags.push('}')
+  result += `<p${outerIdx}/>`
+
+  return result
+}
+
+/** Replace placeholder tokens with XML tags DeepL will leave untouched. */
+function protectPlaceholders(text: string): { text: string; tags: string[] } {
+  const tags: string[] = []
+  const out = text.replace(PLACEHOLDER_RE, (match) => {
+    if (COMPLEX_ICU_HEADER_RE.test(match)) return explodeComplexIcu(match, tags)
+    return protectWhole(match, tags)
+  })
+  return { text: out, tags }
+}
+
+/** Restore XML tags back to the original placeholder tokens. */
+function restorePlaceholders(text: string, tags: string[]): string {
+  return text.replace(/<p(\d+)\/>/g, (_, i) => tags[Number(i)] ?? `<p${i}/>`)
+}
+
 /**
  * DeepL translator plugin using the official deepl-node SDK.
  *
@@ -78,10 +175,17 @@ export class DeepLPlugin implements TranslatorPlugin {
       const opts: deepl.TranslateTextOptions = {}
       if (formality !== 'default') opts.formality = formality
 
-      const result = await translator.translateText(query.sourceText, srcLang, tgtLang, opts)
-      const text = result.text?.trim()
-      if (!text) return []
+      const { text: protected_, tags } = protectPlaceholders(query.sourceText)
+      if (tags.length > 0) {
+        opts.tagHandling = 'xml'
+        opts.ignoreTags = tags.map((_, i) => `p${i}`)
+      }
 
+      const result = await translator.translateText(protected_, srcLang, tgtLang, opts)
+      const raw = result.text?.trim()
+      if (!raw) return []
+
+      const text = tags.length > 0 ? restorePlaceholders(raw, tags) : raw
       console.log(`[DeepLPlugin] result: "${text.slice(0, 80)}"`)
       return [{ text, score: 0.0, storedAt: 0, source: this.displayName }]
     } catch (err) {

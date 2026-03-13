@@ -27,40 +27,30 @@ export function StatusBar({
   const refName = referenceFilePath ? basename(referenceFilePath) : null
 
   return (
-    <div className="flex items-center gap-4 px-3 py-1.5 border-t border-border bg-muted/30 text-xs text-muted-foreground flex-shrink-0">
+    <div className="flex items-center gap-3 px-3 py-1.5 border-t border-border bg-muted/30 text-xs text-muted-foreground flex-shrink-0 select-none">
       {fileName && (
-        <span className="font-medium text-foreground truncate max-w-xs">
-          {fileName}{isDirty ? ' •' : ''}
-        </span>
-      )}
-
-      {/* Reference file indicator */}
-      {refName && (
         <span
-          className="truncate max-w-[180px] text-muted-foreground"
-          title={`Source file: ${referenceFilePath}`}
+          className="font-medium text-foreground truncate max-w-xs flex-shrink-0"
+          title={refName ? `Source: ${referenceFilePath}` : filePath ?? undefined}
         >
-          ↑ {refName}
+          {fileName}{isDirty ? ' •' : ''}
         </span>
       )}
 
       {stats && (
         <>
-          <div className="flex items-center gap-2 flex-1">
-            <div className="w-32 h-1.5 bg-border rounded-full overflow-hidden">
-              <div
-                className="h-full bg-green-500 transition-all"
-                style={{ width: `${stats.percentComplete}%` }}
-              />
-            </div>
-            <span>{stats.percentComplete}%</span>
+          <div className="w-24 h-1.5 bg-border rounded-full overflow-hidden flex-shrink-0">
+            <div
+              className="h-full bg-green-500 transition-all"
+              style={{ width: `${stats.percentComplete}%` }}
+            />
           </div>
-          <span>{stats.translated} of {stats.total} translated</span>
-          {stats.fuzzy > 0 && <span className="text-yellow-600">· {stats.fuzzy} fuzzy</span>}
+          <span className="flex-shrink-0">{stats.translated}/{stats.total}</span>
+          {stats.fuzzy > 0 && <span className="text-yellow-600 flex-shrink-0">{stats.fuzzy} fuzzy</span>}
         </>
       )}
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex items-center gap-1 flex-shrink-0">
         {sourceLanguage && <span>{sourceLanguage}</span>}
         {targetLanguage && <><span>→</span><span>{targetLanguage}</span></>}
       </div>

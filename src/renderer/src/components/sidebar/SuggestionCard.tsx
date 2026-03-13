@@ -33,20 +33,12 @@ export function SuggestionCard({ suggestion, index, onApply, onDelete }: Suggest
       className="group w-full text-left rounded-md border border-border bg-card hover:bg-muted/50 px-3 py-2 transition-colors"
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p
-            className="text-sm overflow-hidden"
-            style={{ lineHeight: '1.45', maxHeight: 'calc(1.45em * 3)' }}
-          >
-            {suggestion.text}
-          </p>
-          <div className="flex items-center gap-2 mt-1">
-            <span className={cn('text-xs font-medium', scoreColor)}>{scoreLabel}</span>
-            {suggestion.score > 0 && suggestion.score < 1 && (
-              <span className="text-xs text-muted-foreground">{suggestion.source}</span>
-            )}
-          </div>
-        </div>
+        <p
+          className="text-sm overflow-hidden flex-1 min-w-0"
+          style={{ lineHeight: '1.45', maxHeight: 'calc(1.45em * 3)' }}
+        >
+          {suggestion.text}
+        </p>
         <div className="flex items-center gap-1 flex-shrink-0">
           {index < 9 && (
             <kbd className="text-xs bg-muted border border-border rounded px-1 py-0.5 text-muted-foreground">
@@ -62,6 +54,12 @@ export function SuggestionCard({ suggestion, index, onApply, onDelete }: Suggest
             </button>
           )}
         </div>
+      </div>
+      <div className="flex items-center gap-2 mt-1">
+        <span className={cn('text-xs font-medium', scoreColor)}>{scoreLabel}</span>
+        {suggestion.score > 0 && suggestion.score < 1 && (
+          <span className="text-xs text-muted-foreground">{suggestion.source}</span>
+        )}
       </div>
     </button>
   )

@@ -82,7 +82,7 @@ export interface TranslationQuery {
 }
 
 /**
- * A single translation suggestion — mirrors Poedit's C++ Suggestion struct.
+ * A single translation suggestion.
  */
 export interface Suggestion {
   text: string
@@ -95,7 +95,7 @@ export interface Suggestion {
   score: number
   /**
    * Unix timestamp (seconds) when stored in TM.
-   * Used to break score ties — mirrors Poedit's localScore.
+   * Used to break score ties.
    * 0 for remote suggestions.
    */
   storedAt: number
@@ -108,7 +108,6 @@ export interface Suggestion {
 /**
  * TranslatorPlugin — provides translation suggestions for a query.
  * Implementations live in src/main/plugins/translators/ and run in the main process.
- * Mirrors Poedit's C++ SuggestionsBackend abstract class.
  */
 export interface TranslatorPlugin {
   readonly id: string

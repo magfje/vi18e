@@ -16,7 +16,7 @@ function createWindow(): void {
     frame: false,
     autoHideMenuBar: true,
     titleBarStyle: "hidden",
-    title: "some translator",
+    title: "v(i18)e",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       sandbox: false,

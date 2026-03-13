@@ -1,5 +1,5 @@
 /**
- * Core catalog data model — mirrors Poedit's CatalogItem / Catalog classes.
+ * Core catalog data model.
  */
 
 export type ItemStatus = 'untranslated' | 'fuzzy' | 'translated'
@@ -10,7 +10,7 @@ export interface CatalogIssue {
 }
 
 /**
- * A single translation entry. Fields mirror Poedit's CatalogItem exactly.
+ * A single translation entry.
  * - For Format.js: msgid = JSON key, source = defaultMessage
  * - For PO/POT: msgid = source text = source
  */

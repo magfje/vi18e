@@ -22,7 +22,7 @@ export function Sidebar({ item, sourceLanguage, targetLanguage, onApplySuggestio
       clearSuggestions()
       return
     }
-    // 300ms debounce — mirrors Poedit's SuggestionsSidebarBlock timer
+    // 300ms debounce
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       fetchSuggestions(item.source, sourceLanguage, targetLanguage)
