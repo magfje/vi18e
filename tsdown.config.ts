@@ -17,16 +17,14 @@ export default defineConfig([
     entry: { index: 'src/main/index.ts' },
     outDir: 'out/main',
     format: 'cjs',
-    platform: 'node',
-    external,
+    deps: { neverBundle: external },
     tsconfig: './tsconfig.node.json'
   },
   {
     entry: { index: 'src/preload/index.ts' },
     outDir: 'out/preload',
     format: 'cjs',
-    platform: 'node',
-    external,
+    deps: { neverBundle: external },
     tsconfig: './tsconfig.node.json'
   }
 ])

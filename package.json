@@ -2,9 +2,9 @@
   "name": "vi18e",
   "version": "0.1.0",
   "description": "A modern translation editor built with Electron and TypeScript",
-  "main": "./out/main/index.js",
+  "main": "./out/main/index.cjs",
   "scripts": {
-    "dev": "node scripts/dev.mjs",
+    "dev": "bun scripts/dev.mjs",
     "build": "tsdown && vite build",
     "preview": "electron .",
     "typecheck": "tsc --noEmit",
@@ -27,7 +27,7 @@
     "@vitejs/plugin-react": "^6.0.0",
     "electron": "^40.6.1",
     "tailwindcss": "^4.2.1",
-    "tsdown": "^0.12.7",
+    "tsdown": "^0.21.2",
     "typescript": "^5.9.3",
     "vite": "^8.0.0"
   },
