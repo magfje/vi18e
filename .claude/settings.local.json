@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git merge claude/sad-brahmagupta --no-ff -m \"feat: add custom window controls \\(minimize/maximize/close\\) for frameless window\")"
+    ]
+  }
+}
