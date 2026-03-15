@@ -39,6 +39,11 @@ function nextVersion(current, type) {
 const prev = pkg.version;
 const next = nextVersion(prev, bump);
 
+if (next === prev) {
+  console.error(`Version is already ${prev}. Use patch/minor/major or specify a higher version.`);
+  process.exit(1);
+}
+
 // Sanity check — make sure working tree is clean before we do anything
 try {
   const dirty = execSync("git status --porcelain").toString().trim();
