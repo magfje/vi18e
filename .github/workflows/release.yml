@@ -44,11 +44,10 @@ jobs:
         run: bun run build
 
       - name: Package
-        run: bunx electron-builder ${{ matrix.args }}
-        env:
-          # electron-builder uses this to publish directly to GitHub Releases
-          # if you add --publish always; here we publish in a separate job.
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # --publish never: prevent electron-builder from uploading anything to
+        # GitHub Releases itself (blockmaps, latest.yml, raw exe, etc.).
+        # We collect only the final installers and publish them in the next job.
+        run: bunx electron-builder ${{ matrix.args }} --publish never
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -56,9 +55,9 @@ jobs:
           name: release-${{ matrix.os }}
           if-no-files-found: error
           path: |
-            release/**/*.exe
-            release/**/*.dmg
-            release/**/*.AppImage
+            release/*Setup*.exe
+            release/*.dmg
+            release/*.AppImage
 
   # ── Create GitHub Release and attach all binaries ─────────────────────────
   publish:
