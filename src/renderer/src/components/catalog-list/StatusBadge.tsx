@@ -1,6 +1,6 @@
 import React from 'react'
-import type { ItemStatus } from '../../../../shared/types/catalog'
-import { cn } from '../../lib/utils'
+import type { ItemStatus } from '@shared/types/catalog'
+import { cn } from '@/lib/utils'
 
 interface StatusBadgeProps {
   status: ItemStatus

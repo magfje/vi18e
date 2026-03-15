@@ -1,4 +1,4 @@
-import type { AppTheme } from '../../../shared/types/ipc'
+import type { AppTheme } from '@shared/types/ipc'
 
 export type { AppTheme }
 

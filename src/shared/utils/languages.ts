@@ -3,7 +3,7 @@
  */
 
 /** Extract the base language code from a BCP-47 tag e.g. "en-US" → "en", "zh_CN" → "zh" */
-export function baseLanguage(code: string): string {
+function baseLanguage(code: string): string {
   return code.split(/[-_]/)[0].toLowerCase()
 }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { cn } from '../../lib/utils'
+import { cn } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
 // DropdownMenu
@@ -26,14 +26,21 @@ export function DropdownMenu({ trigger, children, align = 'left' }: DropdownMenu
 
   return (
     <div ref={ref} className="relative inline-block">
-      <div onClick={() => setOpen((v) => !v)}>{trigger}</div>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setOpen((v) => !v) }}
+      >{trigger}</div>
       {open && (
         <div
+          role="presentation"
           className={cn(
             'absolute top-full mt-1 z-50 min-w-[200px] border border-border bg-popover text-popover-foreground shadow-md py-1',
             align === 'right' ? 'right-0' : 'left-0'
           )}
           onClick={() => setOpen(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}
         >
           {children}
         </div>
@@ -75,6 +82,3 @@ export function DropdownMenuItem({ onClick, disabled, children, className }: Dro
 // DropdownMenuSeparator
 // ---------------------------------------------------------------------------
 
-export function DropdownMenuSeparator({ className }: { className?: string }) {
-  return <div className={cn('my-1 border-t border-border', className)} />
-}

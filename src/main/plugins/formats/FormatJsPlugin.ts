@@ -1,8 +1,8 @@
 import { readFile, writeFile } from 'fs/promises'
 import { extname } from 'path'
-import type { FileFormatPlugin, OpenContext, SaveOptions, FormatCapabilities } from '../../../shared/types/plugins'
-import type { Catalog } from '../../../shared/types/catalog'
-import { makeItem, computeStats } from '../../../shared/types/catalog'
+import type { FileFormatPlugin, OpenContext, SaveOptions, FormatCapabilities } from '@shared/types/plugins'
+import type { Catalog } from '@shared/types/catalog'
+import { makeItem, computeStats } from '@shared/types/catalog'
 
 /**
  * Format.js (react-intl) JSON format plugin.

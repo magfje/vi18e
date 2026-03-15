@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import type { Catalog, CatalogItem } from '../../../shared/types/catalog'
-import { computeStats, makeItem } from '../../../shared/types/catalog'
-import { validatePlaceholders, placeholderIssueMessage } from '../../../shared/utils/validatePlaceholders'
-import { api } from '../lib/api'
+import type { Catalog, CatalogItem } from '@shared/types/catalog'
+import { computeStats, makeItem } from '@shared/types/catalog'
+import { validatePlaceholders, placeholderIssueMessage } from '@shared/utils/validatePlaceholders'
+import { api } from '@/lib/api'
 
 interface CatalogState {
   catalog: Catalog | null
@@ -60,8 +60,19 @@ export const useCatalogStore = create<CatalogState>()(
           // Clear per-item modified flags now that the file is saved
           s.catalog?.items.forEach((item) => { item.isModified = false })
         })
-        // Import into TM
-        await api.tm.import({ catalog })
+        // Import only modified, translated, non-fuzzy items into TM.
+        // Sending the full catalog every save was wasteful (large IPC payload);
+        // this reduces it to just the strings that actually changed this session.
+        const modifiedItems = catalog.items
+          .filter((item) => item.isModified && item.isTranslated && !item.isFuzzy && item.translations[0])
+          .map((item) => ({ source: item.source, translation: item.translations[0] }))
+        if (modifiedItems.length > 0) {
+          await api.tm.import({
+            sourceLanguage: catalog.metadata.sourceLanguage,
+            targetLanguage: catalog.metadata.targetLanguage,
+            items: modifiedItems
+          })
+        }
       }
       return resp.success
     },
@@ -73,6 +84,7 @@ export const useCatalogStore = create<CatalogState>()(
         if (!s.catalog) return
         const item = s.catalog.items.find((i) => i.id === id)
         if (!item) return
+        const prevStatus = item.status
         item.translations = translations
         const hasText = translations[0]?.trim().length > 0
         item.isTranslated = hasText && !item.isFuzzy
@@ -87,7 +99,15 @@ export const useCatalogStore = create<CatalogState>()(
         } else {
           item.issue = undefined
         }
-        s.catalog.stats = computeStats(s.catalog.items)
+        // O(1) incremental update instead of O(n) full recompute
+        if (prevStatus !== item.status) {
+          s.catalog.stats[prevStatus]--
+          s.catalog.stats[item.status]++
+          s.catalog.stats.percentComplete =
+            s.catalog.stats.total > 0
+              ? Math.round((s.catalog.stats.translated / s.catalog.stats.total) * 100)
+              : 0
+        }
         s.isDirty = true
       }),
 
@@ -96,6 +116,7 @@ export const useCatalogStore = create<CatalogState>()(
         if (!s.catalog) return
         const item = s.catalog.items.find((i) => i.id === id)
         if (!item) return
+        const prevStatus = item.status
         item.isFuzzy = fuzzy
         if (fuzzy) {
           if (!item.flags.includes('fuzzy')) item.flags.push('fuzzy')
@@ -106,7 +127,15 @@ export const useCatalogStore = create<CatalogState>()(
         item.isTranslated = hasText && !fuzzy
         item.status = fuzzy ? 'fuzzy' : hasText ? 'translated' : 'untranslated'
         item.isModified = true
-        s.catalog.stats = computeStats(s.catalog.items)
+        // O(1) incremental update instead of O(n) full recompute
+        if (prevStatus !== item.status) {
+          s.catalog.stats[prevStatus]--
+          s.catalog.stats[item.status]++
+          s.catalog.stats.percentComplete =
+            s.catalog.stats.total > 0
+              ? Math.round((s.catalog.stats.translated / s.catalog.stats.total) * 100)
+              : 0
+        }
         s.isDirty = true
       }),
 

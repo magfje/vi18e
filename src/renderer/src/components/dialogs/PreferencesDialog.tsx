@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useCallback, useReducer } from 'react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
@@ -6,11 +6,11 @@ import { Select } from '../ui/select'
 import { Separator } from '../ui/separator'
 import { Switch } from '../ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
-import { api } from '../../lib/api'
-import type { PreferencesData } from '../../../../shared/types/ipc'
-import { cn } from '../../lib/utils'
+import { api } from '@/lib/api'
+import type { PreferencesData } from '@shared/types/ipc'
+import { cn } from '@/lib/utils'
 import { ChevronLeft, Settings2, Languages, Database, Sun, Moon, Monitor } from 'lucide-react'
-import { applyTheme, type AppTheme } from '../../lib/theme'
+import { applyTheme, type AppTheme } from '@/lib/theme'
 
 interface PreferencesPageProps {
   onClose: () => void
@@ -35,102 +35,188 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ComponentType<{ className
   { id: 'memory', label: 'Translation Memory', icon: Database }
 ]
 
-export function PreferencesPage({ onClose }: PreferencesPageProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('general')
-  const [prefs, setPrefs] = useState<PreferencesData | null>(null)
-  const [tmStats, setTmStats] = useState<TMStats | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isClearingTM, setIsClearingTM] = useState(false)
-  const [saved, setSaved] = useState(false)
+// ---------------------------------------------------------------------------
+// Preferences state reducer
+// ---------------------------------------------------------------------------
 
-  // Local editable state
-  const [deeplApiKey, setDeeplApiKey] = useState('')
-  const [deeplFormality, setDeeplFormality] = useState('default')
-  const [deeplServerUrl, setDeeplServerUrl] = useState('')
-  const [defaultSourceLang, setDefaultSourceLang] = useState('en')
-  const [defaultTargetLang, setDefaultTargetLang] = useState('')
-  const [autoFetch, setAutoFetch] = useState(true)
-  const [theme, setTheme] = useState<AppTheme>('system')
-  const [deeplUsage, setDeeplUsage] = useState<{ characterCount: number; characterLimit: number } | null>(null)
-  const [isLoadingUsage, setIsLoadingUsage] = useState(false)
+type PrefsState = {
+  activeTab: Tab
+  // async status
+  isSaving: boolean
+  isClearingTM: boolean
+  saved: boolean
+  isLoadingUsage: boolean
+  // loaded / fetched data
+  tmStats: TMStats | null
+  deeplUsage: { characterCount: number; characterLimit: number } | null
+  // form fields
+  deeplApiKey: string
+  deeplFormality: string
+  deeplServerUrl: string
+  defaultSourceLang: string
+  defaultTargetLang: string
+  autoFetch: boolean
+  theme: AppTheme
+}
+
+type PrefsAction =
+  | { type: 'SET_TAB'; tab: Tab }
+  | { type: 'LOADED'; prefs: PreferencesData }
+  | { type: 'SET_TM_STATS'; stats: TMStats }
+  | { type: 'SET_DEEPL_API_KEY'; value: string }
+  | { type: 'SET_DEEPL_FORMALITY'; value: string }
+  | { type: 'SET_DEEPL_SERVER_URL'; value: string }
+  | { type: 'SET_SOURCE_LANG'; value: string }
+  | { type: 'SET_TARGET_LANG'; value: string }
+  | { type: 'SET_AUTO_FETCH'; value: boolean }
+  | { type: 'SET_THEME'; value: AppTheme }
+  | { type: 'SAVE_START' }
+  | { type: 'SAVE_SUCCESS' }
+  | { type: 'SAVE_ERROR' }
+  | { type: 'SAVE_RESET' }
+  | { type: 'CLEAR_TM_START' }
+  | { type: 'CLEAR_TM_SUCCESS'; stats: TMStats }
+  | { type: 'CLEAR_TM_ERROR' }
+  | { type: 'USAGE_START' }
+  | { type: 'USAGE_SUCCESS'; usage: { characterCount: number; characterLimit: number } }
+  | { type: 'USAGE_ERROR' }
+
+const INITIAL_PREFS_STATE: PrefsState = {
+  activeTab: 'general',
+  isSaving: false,
+  isClearingTM: false,
+  saved: false,
+  isLoadingUsage: false,
+  tmStats: null,
+  deeplUsage: null,
+  deeplApiKey: '',
+  deeplFormality: 'default',
+  deeplServerUrl: '',
+  defaultSourceLang: 'en',
+  defaultTargetLang: '',
+  autoFetch: true,
+  theme: 'system'
+}
+
+function prefsReducer(state: PrefsState, action: PrefsAction): PrefsState {
+  switch (action.type) {
+    case 'SET_TAB':
+      return { ...state, activeTab: action.tab }
+    case 'LOADED': {
+      const deepl = action.prefs.translators['translator.deepl'] ?? {}
+      return {
+        ...state,
+        defaultSourceLang: action.prefs.general.defaultSourceLanguage ?? 'en',
+        defaultTargetLang: action.prefs.general.defaultTargetLanguage ?? '',
+        autoFetch: action.prefs.general.autoFetchSuggestions ?? true,
+        theme: action.prefs.general.theme ?? 'system',
+        deeplApiKey: deepl.apiKey ?? '',
+        deeplFormality: deepl.formality ?? 'default',
+        deeplServerUrl: deepl.serverUrl ?? ''
+      }
+    }
+    case 'SET_TM_STATS':
+      return { ...state, tmStats: action.stats }
+    case 'SET_DEEPL_API_KEY':
+      return { ...state, deeplApiKey: action.value }
+    case 'SET_DEEPL_FORMALITY':
+      return { ...state, deeplFormality: action.value }
+    case 'SET_DEEPL_SERVER_URL':
+      return { ...state, deeplServerUrl: action.value }
+    case 'SET_SOURCE_LANG':
+      return { ...state, defaultSourceLang: action.value }
+    case 'SET_TARGET_LANG':
+      return { ...state, defaultTargetLang: action.value }
+    case 'SET_AUTO_FETCH':
+      return { ...state, autoFetch: action.value }
+    case 'SET_THEME':
+      return { ...state, theme: action.value }
+    case 'SAVE_START':
+      return { ...state, isSaving: true }
+    case 'SAVE_SUCCESS':
+      return { ...state, isSaving: false, saved: true }
+    case 'SAVE_ERROR':
+      return { ...state, isSaving: false }
+    case 'SAVE_RESET':
+      return { ...state, saved: false }
+    case 'CLEAR_TM_START':
+      return { ...state, isClearingTM: true }
+    case 'CLEAR_TM_SUCCESS':
+      return { ...state, isClearingTM: false, tmStats: action.stats }
+    case 'CLEAR_TM_ERROR':
+      return { ...state, isClearingTM: false }
+    case 'USAGE_START':
+      return { ...state, isLoadingUsage: true }
+    case 'USAGE_SUCCESS':
+      return { ...state, isLoadingUsage: false, deeplUsage: action.usage }
+    case 'USAGE_ERROR':
+      return { ...state, isLoadingUsage: false, deeplUsage: null }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function PreferencesPage({ onClose }: PreferencesPageProps) {
+  const [state, dispatch] = useReducer(prefsReducer, INITIAL_PREFS_STATE)
 
   const loadData = useCallback(async () => {
-    const [p, stats] = await Promise.allSettled([api.prefs.get(), api.tm.stats()])
-
-    if (p.status === 'fulfilled') {
-      const data = p.value
-      setPrefs(data)
-      setDefaultSourceLang(data.general.defaultSourceLanguage ?? 'en')
-      setDefaultTargetLang(data.general.defaultTargetLanguage ?? '')
-      setAutoFetch(data.general.autoFetchSuggestions ?? true)
-      setTheme(data.general.theme ?? 'system')
-      const deepl = data.translators['translator.deepl'] ?? {}
-      setDeeplApiKey(deepl.apiKey ?? '')
-      setDeeplFormality(deepl.formality ?? 'default')
-      setDeeplServerUrl(deepl.serverUrl ?? '')
-    }
-
-    if (stats.status === 'fulfilled') {
-      setTmStats(stats.value)
-    }
+    const [p, tmResult] = await Promise.allSettled([api.prefs.get(), api.tm.stats()])
+    if (p.status === 'fulfilled') dispatch({ type: 'LOADED', prefs: p.value })
+    if (tmResult.status === 'fulfilled') dispatch({ type: 'SET_TM_STATS', stats: tmResult.value })
   }, [])
 
   const refreshUsage = useCallback(async () => {
-    setIsLoadingUsage(true)
+    dispatch({ type: 'USAGE_START' })
     try {
       const usage = await api.translate.usage()
-      setDeeplUsage(usage)
+      dispatch({ type: 'USAGE_SUCCESS', usage })
     } catch {
-      setDeeplUsage(null)
-    } finally {
-      setIsLoadingUsage(false)
+      dispatch({ type: 'USAGE_ERROR' })
     }
   }, [])
 
   useEffect(() => {
-    setSaved(false)
-    setDeeplUsage(null)
     loadData()
   }, [loadData])
 
   const handleSave = async () => {
-    setIsSaving(true)
+    dispatch({ type: 'SAVE_START' })
     try {
       await api.prefs.set({
         general: {
-          defaultSourceLanguage: defaultSourceLang,
-          defaultTargetLanguage: defaultTargetLang,
-          autoFetchSuggestions: autoFetch,
-          theme
+          defaultSourceLanguage: state.defaultSourceLang,
+          defaultTargetLanguage: state.defaultTargetLang,
+          autoFetchSuggestions: state.autoFetch,
+          theme: state.theme
         },
         translators: {
           'translator.deepl': {
-            apiKey: deeplApiKey,
-            formality: deeplFormality,
-            serverUrl: deeplServerUrl
+            apiKey: state.deeplApiKey,
+            formality: state.deeplFormality,
+            serverUrl: state.deeplServerUrl
           }
         }
       })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } finally {
-      setIsSaving(false)
+      dispatch({ type: 'SAVE_SUCCESS' })
+      setTimeout(() => dispatch({ type: 'SAVE_RESET' }), 2000)
+    } catch {
+      dispatch({ type: 'SAVE_ERROR' })
     }
   }
 
   const handleClearTM = async () => {
     if (!confirm('Clear all Translation Memory entries? This cannot be undone.')) return
-    setIsClearingTM(true)
+    dispatch({ type: 'CLEAR_TM_START' })
     try {
       await api.tm.clear()
       const stats = await api.tm.stats()
-      setTmStats(stats)
-    } finally {
-      setIsClearingTM(false)
+      dispatch({ type: 'CLEAR_TM_SUCCESS', stats })
+    } catch {
+      dispatch({ type: 'CLEAR_TM_ERROR' })
     }
   }
-
-  void prefs
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -147,13 +233,13 @@ export function PreferencesPage({ onClose }: PreferencesPageProps) {
 
         <div className="flex-1" />
 
-        {saved && <span className="text-sm text-green-600">Settings saved</span>}
+        {state.saved && <span className="text-sm text-green-600">Settings saved</span>}
 
-        <Button variant="outline" size="sm" onClick={onClose} disabled={isSaving}>
+        <Button variant="outline" size="sm" onClick={onClose} disabled={state.isSaving}>
           Cancel
         </Button>
-        <Button size="sm" onClick={handleSave} disabled={isSaving}>
-          {isSaving ? 'Saving…' : 'Save'}
+        <Button size="sm" onClick={handleSave} disabled={state.isSaving}>
+          {state.isSaving ? 'Saving…' : 'Save'}
         </Button>
       </div>
 
@@ -164,10 +250,10 @@ export function PreferencesPage({ onClose }: PreferencesPageProps) {
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
-              onClick={() => setActiveTab(id)}
+              onClick={() => dispatch({ type: 'SET_TAB', tab: id })}
               className={cn(
                 'w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors text-left',
-                activeTab === id
+                state.activeTab === id
                   ? 'bg-accent text-accent-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
               )}
@@ -180,44 +266,44 @@ export function PreferencesPage({ onClose }: PreferencesPageProps) {
 
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto p-8 max-w-2xl">
-          {activeTab === 'general' && (
+          {state.activeTab === 'general' && (
             <GeneralTab
-              defaultSourceLang={defaultSourceLang}
-              defaultTargetLang={defaultTargetLang}
-              autoFetch={autoFetch}
-              theme={theme}
-              onSourceLangChange={setDefaultSourceLang}
-              onTargetLangChange={setDefaultTargetLang}
-              onAutoFetchChange={setAutoFetch}
-              onThemeChange={(t) => {
-                setTheme(t)
-                applyTheme(t) // live preview
+              defaultSourceLang={state.defaultSourceLang}
+              defaultTargetLang={state.defaultTargetLang}
+              autoFetch={state.autoFetch}
+              theme={state.theme}
+              onSourceLangChange={(value) => dispatch({ type: 'SET_SOURCE_LANG', value })}
+              onTargetLangChange={(value) => dispatch({ type: 'SET_TARGET_LANG', value })}
+              onAutoFetchChange={(value) => dispatch({ type: 'SET_AUTO_FETCH', value })}
+              onThemeChange={(value) => {
+                dispatch({ type: 'SET_THEME', value })
+                applyTheme(value) // live preview
               }}
             />
           )}
 
-          {activeTab === 'translators' && (
+          {state.activeTab === 'translators' && (
             <TranslatorsTab
-              deeplApiKey={deeplApiKey}
-              deeplFormality={deeplFormality}
-              deeplServerUrl={deeplServerUrl}
-              deeplUsage={deeplUsage}
-              isLoadingUsage={isLoadingUsage}
-              onApiKeyChange={setDeeplApiKey}
-              onFormalityChange={setDeeplFormality}
-              onServerUrlChange={setDeeplServerUrl}
+              deeplApiKey={state.deeplApiKey}
+              deeplFormality={state.deeplFormality}
+              deeplServerUrl={state.deeplServerUrl}
+              deeplUsage={state.deeplUsage}
+              isLoadingUsage={state.isLoadingUsage}
+              onApiKeyChange={(value) => dispatch({ type: 'SET_DEEPL_API_KEY', value })}
+              onFormalityChange={(value) => dispatch({ type: 'SET_DEEPL_FORMALITY', value })}
+              onServerUrlChange={(value) => dispatch({ type: 'SET_DEEPL_SERVER_URL', value })}
               onRefreshUsage={refreshUsage}
             />
           )}
 
-          {activeTab === 'memory' && (
+          {state.activeTab === 'memory' && (
             <MemoryTab
-              stats={tmStats}
-              isClearing={isClearingTM}
+              stats={state.tmStats}
+              isClearing={state.isClearingTM}
               onClear={handleClearTM}
               onRefresh={async () => {
                 const s = await api.tm.stats()
-                setTmStats(s)
+                dispatch({ type: 'SET_TM_STATS', stats: s })
               }}
             />
           )}
@@ -341,7 +427,7 @@ function TranslatorsTab({
   onServerUrlChange,
   onRefreshUsage
 }: TranslatorsTabProps) {
-  const [showKey, setShowKey] = useState(false)
+  const [showKey, setShowKey] = React.useState(false)
 
   const usagePct = deeplUsage
     ? Math.round((deeplUsage.characterCount / deeplUsage.characterLimit) * 100)
@@ -484,13 +570,14 @@ interface MemoryTabProps {
 }
 
 function MemoryTab({ stats, isClearing, onClear, onRefresh }: MemoryTabProps) {
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isRefreshing, setIsRefreshing] = React.useState(false)
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
     try {
       await onRefresh()
-    } finally {
+      setIsRefreshing(false)
+    } catch {
       setIsRefreshing(false)
     }
   }

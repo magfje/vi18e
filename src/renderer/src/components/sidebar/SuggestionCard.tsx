@@ -1,6 +1,6 @@
 import React from 'react'
-import type { Suggestion } from '../../../../shared/types/plugins'
-import { cn } from '../../lib/utils'
+import type { Suggestion } from '@shared/types/plugins'
+import { cn } from '@/lib/utils'
 import { Trash2 } from 'lucide-react'
 
 interface SuggestionCardProps {

@@ -79,7 +79,10 @@ export interface TMDeleteRequest {
 }
 
 export interface TMImportRequest {
-  catalog: Catalog
+  sourceLanguage: string
+  targetLanguage: string
+  /** Pre-filtered: only translated, non-fuzzy, modified items */
+  items: Array<{ source: string; translation: string }>
 }
 
 export interface TMImportResponse {

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
-import type { CatalogItem } from '../../../../shared/types/catalog'
-import { useSuggestionsStore } from '../../store/suggestionsStore'
+import type { CatalogItem } from '@shared/types/catalog'
+import { useSuggestionsStore } from '@/store/suggestionsStore'
 import { SuggestionCard } from './SuggestionCard'
 import { Separator } from '../ui/separator'
 
@@ -51,11 +51,7 @@ export function Sidebar({ item, sourceLanguage, targetLanguage, onApplySuggestio
       </h3>
 
       {isLoading && (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-14 rounded-md border border-border bg-muted animate-pulse" />
-          ))}
-        </div>
+        <div className="h-14 rounded-md border border-border bg-muted animate-pulse" />
       )}
 
       {!isLoading && suggestions.length === 0 && item && (
@@ -103,8 +99,8 @@ export function Sidebar({ item, sourceLanguage, targetLanguage, onApplySuggestio
           <Separator className="my-1" />
           <div>
             <h4 className="text-xs font-semibold text-muted-foreground mb-1">Notes</h4>
-            {item.extractedComments.map((c, i) => (
-              <p key={i} className="text-xs text-muted-foreground">{c}</p>
+            {item.extractedComments.map((c) => (
+              <p key={c} className="text-xs text-muted-foreground">{c}</p>
             ))}
           </div>
         </>

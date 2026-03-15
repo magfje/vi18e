@@ -1,6 +1,6 @@
 import * as deepl from 'deepl-node'
-import type { TranslatorPlugin, TranslationQuery, Suggestion } from '../../../shared/types/plugins'
-import { toDeepLSourceCode, toDeepLTargetCode } from '../../../shared/utils/languages'
+import type { TranslatorPlugin, TranslationQuery, Suggestion } from '@shared/types/plugins'
+import { toDeepLSourceCode, toDeepLTargetCode } from '@shared/utils/languages'
 
 // Matches ICU simple/complex, Python-named, printf-numbered, printf-positional placeholders
 const PLACEHOLDER_RE = /\{[a-zA-Z_$][a-zA-Z0-9_$]*(?:[^{}]|\{[^{}]*\})*\}|%\([a-zA-Z_][a-zA-Z0-9_]*\)[diouxXeEfFgGcrsabu]|%\d+\$[diouxXeEfFgGcrsabu]|(?<!%)%[diouxXeEfFgGcrsabu]/g

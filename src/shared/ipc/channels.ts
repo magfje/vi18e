@@ -39,4 +39,3 @@ export const IPC = {
   WINDOW_MAXIMIZED_CHANGED: 'window:maximized-changed'
 } as const
 
-export type IPCChannel = (typeof IPC)[keyof typeof IPC]

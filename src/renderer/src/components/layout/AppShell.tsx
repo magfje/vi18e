@@ -1,18 +1,32 @@
-import React, { useState, useCallback, useEffect } from 'react'
-import { useHotkeys } from 'react-hotkeys-hook'
-import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels'
-import { useCatalogStore, selectedItem } from '../../store/catalogStore'
-import { CatalogList } from '../catalog-list/CatalogList'
-import { EditingArea } from '../editing-area/EditingArea'
-import { Sidebar } from '../sidebar/Sidebar'
-import { StatusBar } from './StatusBar'
-import { PreferencesPage } from '../dialogs/PreferencesDialog'
-import { api } from '../../lib/api'
-import { Button } from '../ui/button'
-import { DropdownMenu, DropdownMenuItem } from '../ui/dropdown-menu'
-import type { RecentFile } from '../../../../shared/types/ipc'
-import { FolderOpen, Save, Settings, ChevronDown, ChevronRight, Minus, Square, X } from 'lucide-react'
-import { validatePlaceholders } from '../../../../shared/utils/validatePlaceholders'
+import { api } from "@/lib/api";
+import { selectedItem, useCatalogStore } from "@/store/catalogStore";
+import type { RecentFile } from "@shared/types/ipc";
+import { validatePlaceholders } from "@shared/utils/validatePlaceholders";
+import {
+  ChevronDown,
+  ChevronRight,
+  FolderOpen,
+  Minus,
+  Save,
+  Settings,
+  Square,
+  X,
+} from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
+import {
+  Panel,
+  Group as PanelGroup,
+  Separator as PanelResizeHandle,
+} from "react-resizable-panels";
+import { CatalogList } from "../catalog-list/CatalogList";
+import { PreferencesPage } from "../dialogs/PreferencesDialog";
+import { EditingArea } from "../editing-area/EditingArea";
+import { Sidebar } from "../sidebar/Sidebar";
+import { AlertDialog } from "../ui/alert-dialog";
+import { Button } from "../ui/button";
+import { DropdownMenu, DropdownMenuItem } from "../ui/dropdown-menu";
+import { StatusBar } from "./StatusBar";
 
 export function AppShell() {
   const {
@@ -27,93 +41,143 @@ export function AppShell() {
     setComment,
     openFile,
     saveFile,
-    clearError
-  } = useCatalogStore()
+    clearError,
+  } = useCatalogStore();
 
-  const [prefsOpen, setPrefsOpen] = useState(false)
-  const [recentFiles, setRecentFiles] = useState<RecentFile[]>([])
-  const [saveCount, setSaveCount] = useState(0)
-  const [isMaximized, setIsMaximized] = useState(false)
+  const [prefsOpen, setPrefsOpen] = useState(false);
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
+  const [saveCount, setSaveCount] = useState(0);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [mismatchCount, setMismatchCount] = useState(0);
 
-  const item = useCatalogStore(selectedItem)
+  const item = useCatalogStore(selectedItem);
 
   // Load recent files on mount
   useEffect(() => {
-    api.file.recentList().then(setRecentFiles).catch(() => {})
-  }, [])
+    api.file
+      .recentList()
+      .then(setRecentFiles)
+      .catch(() => {});
+  }, []);
 
   // Track maximize state
   useEffect(() => {
-    return api.win.onMaximizedChanged(setIsMaximized)
-  }, [])
+    return api.win.onMaximizedChanged(setIsMaximized);
+  }, []);
 
-  useHotkeys('ctrl+s', () => { if (catalog && isDirty) handleSave() }, { enableOnFormTags: true }, [catalog, isDirty])
+  const handleSave = async () => {
+    const problematic = (catalog?.items ?? []).filter(
+      (item) =>
+        item.translations[0]?.trim() &&
+        validatePlaceholders(item.source, item.translations[0]).hasIssue,
+    );
+    if (problematic.length > 0) {
+      setMismatchCount(problematic.length);
+      return;
+    }
+    await doSave();
+  };
+
+  const doSave = async () => {
+    const ok = await saveFile();
+    if (ok) setSaveCount((c) => c + 1);
+  };
+
+  useHotkeys(
+    "ctrl+s",
+    () => {
+      if (catalog && isDirty) handleSave();
+    },
+    { enableOnFormTags: true },
+    [catalog, isDirty],
+  );
 
   const handleOpen = async () => {
     const resp = await api.file.openDialog({
-      title: 'Open Translation File',
+      title: "Open Translation File",
       filters: [
-        { name: 'Translation Files', extensions: ['json', 'po', 'pot'] },
-        { name: 'All Files', extensions: ['*'] }
-      ]
-    })
+        { name: "Translation Files", extensions: ["json", "po", "pot"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
     if (!resp.cancelled && resp.filePaths[0]) {
-      await openFile(resp.filePaths[0])
-      setPrefsOpen(false)
+      await openFile(resp.filePaths[0]);
+      setPrefsOpen(false);
       // Refresh recent files
-      api.file.recentList().then(setRecentFiles).catch(() => {})
+      api.file
+        .recentList()
+        .then(setRecentFiles)
+        .catch(() => {});
     }
-  }
+  };
 
   const handleOpenRecent = async (filePath: string) => {
-    await openFile(filePath)
-    setPrefsOpen(false)
-    api.file.recentList().then(setRecentFiles).catch(() => {})
-  }
-
-  const handleSave = async () => {
-    // Warn if any translated items have placeholder mismatches
-    const problematic = (catalog?.items ?? []).filter(
-      (item) => item.translations[0]?.trim() && validatePlaceholders(item.source, item.translations[0]).hasIssue
-    )
-    if (problematic.length > 0) {
-      const proceed = window.confirm(
-        `${problematic.length} translation${problematic.length === 1 ? '' : 's'} have placeholder mismatches` +
-          ` (e.g. {name}, %(date)s, or %s placeholders may have been mistranslated or dropped).\n\nSave anyway?`
-      )
-      if (!proceed) return
-    }
-    const ok = await saveFile()
-    if (ok) setSaveCount((c) => c + 1)
-  }
+    await openFile(filePath);
+    setPrefsOpen(false);
+    api.file
+      .recentList()
+      .then(setRecentFiles)
+      .catch(() => {});
+  };
 
   const handleApplySuggestion = useCallback(
     (text: string) => {
       if (selectedId !== null) {
-        const curr = catalog?.items.find((i) => i.id === selectedId)
-        const translations = curr ? [...curr.translations] : ['']
-        translations[0] = text
-        updateTranslation(selectedId, translations)
+        const curr = catalog?.items.find((i) => i.id === selectedId);
+        const translations = curr ? [...curr.translations] : [""];
+        translations[0] = text;
+        updateTranslation(selectedId, translations);
       }
     },
-    [selectedId, catalog, updateTranslation]
-  )
+    [selectedId, catalog, updateTranslation],
+  );
 
   const formatCapabilities = catalog
-    ? { fuzzyTranslations: catalog.formatId === 'gettext-po', userComments: catalog.formatId === 'gettext-po' }
-    : { fuzzyTranslations: false, userComments: false }
+    ? {
+        fuzzyTranslations: catalog.formatId === "gettext-po",
+        userComments: catalog.formatId === "gettext-po",
+      }
+    : { fuzzyTranslations: false, userComments: false };
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
+      <AlertDialog
+        open={mismatchCount > 0}
+        title="Placeholder mismatches"
+        description={
+          <>
+            <strong>{mismatchCount}</strong>{" "}
+            {mismatchCount === 1 ? "translation has" : "translations have"}{" "}
+            placeholder mismatches — variables like{" "}
+            <code className="font-mono bg-muted px-1">{"{name}"}</code>,{" "}
+            <code className="font-mono bg-muted px-1">{"%(date)s"}</code>, or{" "}
+            <code className="font-mono bg-muted px-1">{"%s"}</code> may have
+            been dropped or mistranslated.
+          </>
+        }
+        confirmLabel="Save anyway"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => { setMismatchCount(0); void doSave(); }}
+        onCancel={() => setMismatchCount(0)}
+      />
       {/* Toolbar — draggable titlebar region */}
       <div
         className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background flex-shrink-0 select-none"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       >
-        <span className="font-semibold text-sm mr-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>v(i18)e</span>
+        <span
+          className="font-semibold text-sm mr-2"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        >
+          v(i18)e
+        </span>
 
         {/* Interactive toolbar buttons must opt out of drag */}
-        <div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <div
+          className="flex items-center gap-2"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        >
           {!prefsOpen && (
             <>
               {/* Split open button */}
@@ -130,18 +194,30 @@ export function AppShell() {
                 <DropdownMenu
                   align="left"
                   trigger={
-                    <Button variant="outline" size="sm" className="rounded-l-none px-1.5" title="Recent files">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-l-none px-1.5"
+                      title="Recent files"
+                    >
                       <ChevronDown className="h-3.5 w-3.5" />
                     </Button>
                   }
                 >
                   {recentFiles.length === 0 ? (
-                    <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
+                    <DropdownMenuItem disabled>
+                      No recent files
+                    </DropdownMenuItem>
                   ) : (
                     recentFiles.map((f) => (
-                      <DropdownMenuItem key={f.filePath} onClick={() => handleOpenRecent(f.filePath)}>
+                      <DropdownMenuItem
+                        key={f.filePath}
+                        onClick={() => handleOpenRecent(f.filePath)}
+                      >
                         <div className="flex flex-col">
-                          <span className="font-medium text-xs">{basename(f.filePath)}</span>
+                          <span className="font-medium text-xs">
+                            {basename(f.filePath)}
+                          </span>
                           <span className="text-xs text-muted-foreground truncate max-w-[280px]">
                             {f.filePath}
                           </span>
@@ -149,7 +225,6 @@ export function AppShell() {
                       </DropdownMenuItem>
                     ))
                   )}
-
                 </DropdownMenu>
               </div>
 
@@ -160,7 +235,7 @@ export function AppShell() {
                 disabled={!catalog || !isDirty}
               >
                 <Save className="h-3.5 w-3.5 mr-1.5" />
-                Save{isDirty ? ' *' : ''}
+                Save{isDirty ? " *" : ""}
               </Button>
             </>
           )}
@@ -169,9 +244,9 @@ export function AppShell() {
         <div className="flex-1" />
 
         {/* Preferences button */}
-        <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <div style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
           <Button
-            variant={prefsOpen ? 'secondary' : 'ghost'}
+            variant={prefsOpen ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setPrefsOpen((v) => !v)}
           >
@@ -183,7 +258,7 @@ export function AppShell() {
         {/* Window controls */}
         <div
           className="flex items-center ml-2"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
           <button
             onClick={() => api.win.minimize()}
@@ -195,7 +270,7 @@ export function AppShell() {
           <button
             onClick={() => api.win.maximize()}
             className="flex items-center justify-center w-10 h-8 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-            title={isMaximized ? 'Restore' : 'Maximize'}
+            title={isMaximized ? "Restore" : "Maximize"}
           >
             <Square className="h-3 w-3" />
           </button>
@@ -249,7 +324,11 @@ export function AppShell() {
 
               <PanelResizeHandle className="w-1 bg-border hover:bg-primary/30 transition-colors cursor-col-resize" />
 
-              <Panel defaultSize={35} minSize={15} className="border-l border-border">
+              <Panel
+                defaultSize={35}
+                minSize={15}
+                className="border-l border-border"
+              >
                 <Sidebar
                   item={item}
                   sourceLanguage={catalog.metadata.sourceLanguage}
@@ -263,26 +342,37 @@ export function AppShell() {
           <PanelResizeHandle className="h-1 bg-border hover:bg-primary/30 transition-colors cursor-row-resize" />
 
           {/* Bottom: Editing area full-width */}
-          <Panel defaultSize={40} minSize={15} className="border-t border-border">
+          <Panel
+            defaultSize={40}
+            minSize={15}
+            className="border-t border-border"
+          >
             <EditingArea
               item={item}
               hasFuzzyCapability={formatCapabilities.fuzzyTranslations}
               hasCommentCapability={formatCapabilities.userComments}
               onTranslationChange={(translations) => {
-                if (selectedId !== null) updateTranslation(selectedId, translations)
+                if (selectedId !== null)
+                  updateTranslation(selectedId, translations);
               }}
               onFuzzyChange={(fuzzy) => {
-                if (selectedId !== null) setFuzzy(selectedId, fuzzy)
+                if (selectedId !== null) setFuzzy(selectedId, fuzzy);
               }}
               onCommentChange={(comment) => {
-                if (selectedId !== null) setComment(selectedId, comment)
+                if (selectedId !== null) setComment(selectedId, comment);
               }}
             />
           </Panel>
         </PanelGroup>
       ) : (
         /* Welcome screen */
-        !isLoading && <WelcomeScreen recentFiles={recentFiles} onOpen={handleOpen} onOpenRecent={handleOpenRecent} />
+        !isLoading && (
+          <WelcomeScreen
+            recentFiles={recentFiles}
+            onOpen={handleOpen}
+            onOpenRecent={handleOpenRecent}
+          />
+        )
       )}
 
       {/* Status bar — hidden when preferences are open */}
@@ -292,12 +382,12 @@ export function AppShell() {
           filePath={catalog?.filePath ?? null}
           referenceFilePath={catalog?.referenceFilePath ?? null}
           isDirty={isDirty}
-          sourceLanguage={catalog?.metadata.sourceLanguage ?? ''}
-          targetLanguage={catalog?.metadata.targetLanguage ?? ''}
+          sourceLanguage={catalog?.metadata.sourceLanguage ?? ""}
+          targetLanguage={catalog?.metadata.targetLanguage ?? ""}
         />
       )}
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -305,12 +395,16 @@ export function AppShell() {
 // ---------------------------------------------------------------------------
 
 interface WelcomeScreenProps {
-  recentFiles: RecentFile[]
-  onOpen: () => void
-  onOpenRecent: (filePath: string) => void
+  recentFiles: RecentFile[];
+  onOpen: () => void;
+  onOpenRecent: (filePath: string) => void;
 }
 
-function WelcomeScreen({ recentFiles, onOpen, onOpenRecent }: WelcomeScreenProps) {
+function WelcomeScreen({
+  recentFiles,
+  onOpen,
+  onOpenRecent,
+}: WelcomeScreenProps) {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-xl mx-auto px-8 py-12">
@@ -342,7 +436,9 @@ function WelcomeScreen({ recentFiles, onOpen, onOpenRecent }: WelcomeScreenProps
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-accent/60 transition-colors text-left group"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm">{basename(f.filePath)}</div>
+                    <div className="font-medium text-sm">
+                      {basename(f.filePath)}
+                    </div>
                     <div className="text-xs text-muted-foreground truncate mt-0.5">
                       {f.filePath}
                     </div>
@@ -362,10 +458,10 @@ function WelcomeScreen({ recentFiles, onOpen, onOpenRecent }: WelcomeScreenProps
         )}
       </div>
     </div>
-  )
+  );
 }
 
 /** Cross-platform basename without importing node:path in renderer */
 function basename(filePath: string): string {
-  return filePath.replace(/\\/g, '/').split('/').pop() ?? filePath
+  return filePath.replace(/\\/g, "/").split("/").pop() ?? filePath;
 }

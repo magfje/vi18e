@@ -36,7 +36,11 @@ export function registerTMHandlers(): void {
   })
 
   ipcMain.handle(IPC.TM_IMPORT, (_event, req: TMImportRequest) => {
-    const inserted = TranslationMemory.get().importCatalog(req.catalog)
+    const inserted = TranslationMemory.get().importItems(
+      req.sourceLanguage,
+      req.targetLanguage,
+      req.items
+    )
     return { inserted } satisfies TMImportResponse
   })
 

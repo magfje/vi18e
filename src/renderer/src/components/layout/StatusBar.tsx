@@ -1,5 +1,5 @@
 import React from 'react'
-import type { CatalogStats } from '../../../../shared/types/catalog'
+import type { CatalogStats } from '@shared/types/catalog'
 
 interface StatusBarProps {
   stats: CatalogStats | null

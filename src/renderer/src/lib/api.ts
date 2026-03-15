@@ -1,4 +1,4 @@
-import { IPC } from '../../../shared/ipc/channels'
+import { IPC } from '@shared/ipc/channels'
 import type {
   OpenFileRequest,
   OpenFileResponse,
@@ -19,7 +19,7 @@ import type {
   DeepLUsageResponse,
   PreferencesData,
   RecentFile
-} from '../../../shared/types/ipc'
+} from '@shared/types/ipc'
 
 declare global {
   interface Window {

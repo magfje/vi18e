@@ -1,5 +1,5 @@
 import Store from 'electron-store'
-import type { PreferencesData, RecentFile, TranslatorSettings } from '../../shared/types/ipc'
+import type { PreferencesData, RecentFile, TranslatorSettings } from '@shared/types/ipc'
 
 const MAX_RECENT = 10
 

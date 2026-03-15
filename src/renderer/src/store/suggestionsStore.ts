@@ -1,7 +1,7 @@
 import { create } from 'zustand'
-import type { Suggestion } from '../../../shared/types/plugins'
-import { sortSuggestions } from '../../../shared/utils/scoring'
-import { api } from '../lib/api'
+import type { Suggestion } from '@shared/types/plugins'
+import { sortSuggestions } from '@shared/utils/scoring'
+import { api } from '@/lib/api'
 
 interface SuggestionsState {
   suggestions: Suggestion[]

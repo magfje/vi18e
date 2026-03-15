@@ -112,7 +112,7 @@ function extractPlaceholders(text: string): string[] {
   return result
 }
 
-export interface PlaceholderValidation {
+interface PlaceholderValidation {
   /** Tokens present in source but absent from translation */
   missing: string[]
   /** Tokens in translation that aren't in source */

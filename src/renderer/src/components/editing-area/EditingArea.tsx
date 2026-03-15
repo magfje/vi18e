@@ -1,17 +1,18 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import type { CatalogItem } from '../../../../shared/types/catalog'
-import { cn } from '../../lib/utils'
-import { Badge } from '../ui/badge'
-import { AlertTriangle } from 'lucide-react'
-import { validatePlaceholders } from '../../../../shared/utils/validatePlaceholders'
+import { cn } from "@/lib/utils";
+import type { CatalogItem } from "@shared/types/catalog";
+import { validatePlaceholders } from "@shared/utils/validatePlaceholders";
+import { AlertTriangle } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Badge } from "../ui/badge";
+import { CopyableBadge } from "../ui/CopyableBadge";
 
 interface EditingAreaProps {
-  item: CatalogItem | null
-  hasFuzzyCapability: boolean
-  hasCommentCapability: boolean
-  onTranslationChange: (translations: string[]) => void
-  onFuzzyChange: (fuzzy: boolean) => void
-  onCommentChange: (comment: string) => void
+  item: CatalogItem | null;
+  hasFuzzyCapability: boolean;
+  hasCommentCapability: boolean;
+  onTranslationChange: (translations: string[]) => void;
+  onFuzzyChange: (fuzzy: boolean) => void;
+  onCommentChange: (comment: string) => void;
 }
 
 export function EditingArea({
@@ -20,71 +21,92 @@ export function EditingArea({
   hasCommentCapability,
   onTranslationChange,
   onFuzzyChange,
-  onCommentChange
+  onCommentChange,
 }: EditingAreaProps) {
-  const isPlural = Boolean(item?.sourcePlural)
-  const pluralCount = isPlural ? Math.max(2, item?.translations.length ?? 2) : 1
+  const isPlural = Boolean(item?.sourcePlural);
+  const pluralCount = isPlural
+    ? Math.max(2, item?.translations.length ?? 2)
+    : 1;
 
-  const [localTranslations, setLocalTranslations] = useState<string[]>([''])
-  const [localComment, setLocalComment] = useState('')
-  const [activePluralTab, setActivePluralTab] = useState(0)
+  const [localTranslations, setLocalTranslations] = useState<string[]>([""]);
+  const [localComment, setLocalComment] = useState("");
+  const [activePluralTab, setActivePluralTab] = useState(0);
 
   useEffect(() => {
-    const t = item?.translations ?? ['']
+    const t = item?.translations ?? [""];
     // Ensure we have the right number of slots for plural forms
-    const filled = Array.from({ length: isPlural ? pluralCount : 1 }, (_, i) => t[i] ?? '')
-    setLocalTranslations(filled)
-    setLocalComment(item?.comment ?? '')
-    setActivePluralTab(0)
+    const filled = Array.from(
+      { length: isPlural ? pluralCount : 1 },
+      (_, i) => t[i] ?? "",
+    );
+    setLocalTranslations(filled);
+    setLocalComment(item?.comment ?? "");
+    setActivePluralTab(0);
     // Deps include translations join so that applying a suggestion (which updates
     // the store directly) causes this effect to re-run and the textarea to update.
-  }, [item?.id, item?.translations?.join('\x00')])
+  }, [item?.id, item?.translations?.join("\x00")]);
 
   // Validate placeholder consistency in real-time (from local textarea state, before blur)
   const placeholderValidation = useMemo(() => {
-    if (!item?.source || !localTranslations[0]?.trim()) return null
-    return validatePlaceholders(item.source, localTranslations[0])
-  }, [item?.source, localTranslations[0]])
+    if (!item?.source || !localTranslations[0]?.trim()) return null;
+    return validatePlaceholders(item.source, localTranslations[0]);
+  }, [item?.source, localTranslations[0]]);
 
   if (!item) {
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
         Select an entry to edit
       </div>
-    )
+    );
   }
 
   const handleTranslationBlur = () => {
-    onTranslationChange(localTranslations)
-  }
+    onTranslationChange(localTranslations);
+  };
 
   const handlePluralChange = (index: number, value: string) => {
-    const next = [...localTranslations]
-    while (next.length <= index) next.push('')
-    next[index] = value
-    setLocalTranslations(next)
-  }
+    const next = [...localTranslations];
+    while (next.length <= index) next.push("");
+    next[index] = value;
+    setLocalTranslations(next);
+  };
 
   const handleCommentBlur = () => {
-    onCommentChange(localComment)
-  }
+    onCommentChange(localComment);
+  };
 
   return (
     <div className="flex flex-col h-full p-3 gap-3 overflow-y-auto select-none">
       {/* Item header */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        <span className="text-xs text-muted-foreground font-mono">#{item.id}</span>
+        <span className="text-xs text-muted-foreground font-mono">
+          #{item.id}
+        </span>
         {item.context && (
-          <Badge variant="outline" className="text-xs">{item.context}</Badge>
+          <Badge variant="outline" className="text-xs">
+            {item.context}
+          </Badge>
         )}
+
         {item.isFuzzy && <Badge variant="warning">Fuzzy</Badge>}
-        {item.status === 'untranslated' && <Badge variant="destructive">Untranslated</Badge>}
-        {isPlural && <Badge variant="outline" className="text-xs">Plural</Badge>}
+        {item.status === "untranslated" && (
+          <Badge variant="destructive">Untranslated</Badge>
+        )}
+        {isPlural && (
+          <Badge variant="outline" className="text-xs">
+            Plural
+          </Badge>
+        )}
+        {item.msgid && (
+          <CopyableBadge value={item.msgid}>ID: {item.msgid}</CopyableBadge>
+        )}
       </div>
 
       {/* Source text */}
       <div className="flex-shrink-0">
-        <label className="text-xs font-medium text-muted-foreground mb-1 block">Source</label>
+        <span className="text-xs font-medium text-muted-foreground mb-1 block">
+          Source
+        </span>
         <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm select-text">
           <HighlightedText text={item.source} />
         </div>
@@ -96,7 +118,7 @@ export function EditingArea({
         )}
         {item.extractedComments.length > 0 && (
           <p className="text-xs text-muted-foreground mt-1 italic">
-            {item.extractedComments.join(' · ')}
+            {item.extractedComments.join(" · ")}
           </p>
         )}
         {item.references.length > 0 && (
@@ -108,7 +130,9 @@ export function EditingArea({
       <div className="flex-1 min-h-0 flex flex-col">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-muted-foreground">Translation</label>
+            <span className="text-xs font-medium text-muted-foreground">
+              Translation
+            </span>
             {/* Plural form tabs */}
             {isPlural && (
               <div className="flex gap-0.5">
@@ -117,13 +141,17 @@ export function EditingArea({
                     key={i}
                     onClick={() => setActivePluralTab(i)}
                     className={cn(
-                      'px-2 py-0.5 rounded text-xs border transition-colors',
+                      "px-2 py-0.5 rounded text-xs border transition-colors",
                       activePluralTab === i
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'border-input text-muted-foreground hover:bg-muted'
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-input text-muted-foreground hover:bg-muted",
                     )}
                   >
-                    {i === 0 ? 'Singular' : i === 1 ? 'Plural' : `Form ${i + 1}`}
+                    {i === 0
+                      ? "Singular"
+                      : i === 1
+                        ? "Plural"
+                        : `Form ${i + 1}`}
                   </button>
                 ))}
               </div>
@@ -133,13 +161,13 @@ export function EditingArea({
             <button
               onClick={() => onFuzzyChange(!item.isFuzzy)}
               className={cn(
-                'text-xs px-2 py-0.5 rounded border transition-colors',
+                "text-xs px-2 py-0.5 rounded border transition-colors",
                 item.isFuzzy
-                  ? 'bg-yellow-100 border-yellow-300 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                  : 'border-input text-muted-foreground hover:bg-muted'
+                  ? "bg-yellow-100 border-yellow-300 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                  : "border-input text-muted-foreground hover:bg-muted",
               )}
             >
-              {item.isFuzzy ? '✓ Needs work' : 'Mark as fuzzy'}
+              {item.isFuzzy ? "✓ Needs work" : "Mark as fuzzy"}
             </button>
           )}
         </div>
@@ -156,10 +184,16 @@ export function EditingArea({
         ) : (
           <textarea
             key={activePluralTab}
-            value={localTranslations[activePluralTab] ?? ''}
-            onChange={(e) => handlePluralChange(activePluralTab, e.target.value)}
+            value={localTranslations[activePluralTab] ?? ""}
+            onChange={(e) =>
+              handlePluralChange(activePluralTab, e.target.value)
+            }
             onBlur={handleTranslationBlur}
-            placeholder={activePluralTab === 0 ? 'Singular form…' : `Plural form ${activePluralTab + 1}…`}
+            placeholder={
+              activePluralTab === 0
+                ? "Singular form…"
+                : `Plural form ${activePluralTab + 1}…`
+            }
             className="flex-1 min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
           />
         )}
@@ -172,10 +206,10 @@ export function EditingArea({
               <span className="font-medium">Placeholder mismatch</span>
               {placeholderValidation.missing.length > 0 && (
                 <span>
-                  {' — '}missing:{' '}
+                  {" — "}missing:{" "}
                   {placeholderValidation.missing.map((v, i) => (
                     <React.Fragment key={v}>
-                      {i > 0 && ', '}
+                      {i > 0 && ", "}
                       <PlaceholderChip token={v} variant="amber" />
                     </React.Fragment>
                   ))}
@@ -183,11 +217,11 @@ export function EditingArea({
               )}
               {placeholderValidation.extra.length > 0 && (
                 <span>
-                  {placeholderValidation.missing.length > 0 ? ' · ' : ' — '}
-                  unexpected:{' '}
+                  {placeholderValidation.missing.length > 0 ? " · " : " — "}
+                  unexpected:{" "}
                   {placeholderValidation.extra.map((v, i) => (
                     <React.Fragment key={v}>
-                      {i > 0 && ', '}
+                      {i > 0 && ", "}
                       <PlaceholderChip token={v} variant="amber" />
                     </React.Fragment>
                   ))}
@@ -201,10 +235,14 @@ export function EditingArea({
       {/* Comment */}
       {hasCommentCapability && (
         <div className="flex-shrink-0">
-          <label className="text-xs font-medium text-muted-foreground mb-1 block">
+          <label
+            htmlFor="translator-comment"
+            className="text-xs font-medium text-muted-foreground mb-1 block"
+          >
             Translator comment
           </label>
           <textarea
+            id="translator-comment"
             value={localComment}
             onChange={(e) => setLocalComment(e.target.value)}
             onBlur={handleCommentBlur}
@@ -215,7 +253,7 @@ export function EditingArea({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -229,23 +267,32 @@ export function EditingArea({
  * of the editing area and the popover opens downward over the textarea.
  */
 function ReferencesPopover({ references }: { references: string[] }) {
-  const [open, setOpen] = useState(false)
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear pending timer on unmount to prevent setState on unmounted component
+  useEffect(() => {
+    return () => { if (closeTimer.current) clearTimeout(closeTimer.current) }
+  }, []);
 
   const show = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current)
-    setOpen(true)
-  }
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(true);
+  };
   // Small delay on leave so the user can move the mouse onto the popover itself
   const hide = () => {
-    closeTimer.current = setTimeout(() => setOpen(false), 80)
-  }
+    closeTimer.current = setTimeout(() => setOpen(false), 80);
+  };
 
   const label =
-    references.length === 1 ? '1 reference' : `${references.length} references`
+    references.length === 1 ? "1 reference" : `${references.length} references`;
 
   return (
-    <div className="relative inline-block mt-1" onMouseEnter={show} onMouseLeave={hide}>
+    <div
+      className="relative inline-block mt-1"
+      onMouseEnter={show}
+      onMouseLeave={hide}
+    >
       <span className="text-xs text-muted-foreground cursor-default select-none underline underline-offset-2 decoration-dotted">
         {label}
       </span>
@@ -261,7 +308,11 @@ function ReferencesPopover({ references }: { references: string[] }) {
           </p>
           <div className="space-y-0.5">
             {references.map((ref, i) => (
-              <p key={i} className="text-xs font-mono text-foreground truncate" title={ref}>
+              <p
+                key={i}
+                className="text-xs font-mono text-foreground truncate"
+                title={ref}
+              >
                 {ref}
               </p>
             ))}
@@ -269,7 +320,7 @@ function ReferencesPopover({ references }: { references: string[] }) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -280,7 +331,7 @@ function ReferencesPopover({ references }: { references: string[] }) {
  * Printf format specifier characters we recognise.
  * Kept in sync with validatePlaceholders.ts.
  */
-const PRINTF_SPECS = 'diouxXeEfFgGcrsabu'
+const PRINTF_SPECS = "diouxXeEfFgGcrsabu";
 
 /**
  * Splits text into alternating [plain, token, plain, token, …] segments.
@@ -297,52 +348,57 @@ const PRINTF_SPECS = 'diouxXeEfFgGcrsabu'
  */
 const PLACEHOLDER_SPLIT_RE = new RegExp(
   `(` +
-  // ICU: simple {name} OR complex {count, plural, one {…} other {…}}
-  // The inner alternation (?:[^{}]|\{[^{}]*\})* handles one level of nesting,
-  // which covers all plural/select/selectordinal forms in practice.
-  `\\{[a-zA-Z_$][a-zA-Z0-9_$]*(?:[^{}]|\\{[^{}]*\\})*\\}` +
-  `|%\\([a-zA-Z_][a-zA-Z0-9_]*\\)[${PRINTF_SPECS}]` +   // %(name)s
-  `|%\\d+\\$[${PRINTF_SPECS}]` +                         // %1$s
-  `|(?<!%)%[${PRINTF_SPECS}]` +                          // %s (not preceded by %)
-  `|<[^>]+>` +                                           // <tag>
-  `|#` +                                                 // plural #
-  `)`,
-  'g'
-)
+    // ICU: simple {name} OR complex {count, plural, one {…} other {…}}
+    // The inner alternation (?:[^{}]|\{[^{}]*\})* handles one level of nesting,
+    // which covers all plural/select/selectordinal forms in practice.
+    `\\{[a-zA-Z_$][a-zA-Z0-9_$]*(?:[^{}]|\\{[^{}]*\\})*\\}` +
+    `|%\\([a-zA-Z_][a-zA-Z0-9_]*\\)[${PRINTF_SPECS}]` + // %(name)s
+    `|%\\d+\\$[${PRINTF_SPECS}]` + // %1$s
+    `|(?<!%)%[${PRINTF_SPECS}]` + // %s (not preceded by %)
+    `|<[^>]+>` + // <tag>
+    `|#` + // plural #
+    `)`,
+  "g",
+);
 
 /** Tests whether a split segment is ANY recognised placeholder token. */
 const PLACEHOLDER_IS_RE = new RegExp(
   `^(` +
-  `\\{[a-zA-Z_$][a-zA-Z0-9_$]*(?:[^{}]|\\{[^{}]*\\})*\\}` + // ICU (simple or complex)
-  `|%\\([a-zA-Z_][a-zA-Z0-9_]*\\)[${PRINTF_SPECS}]` +
-  `|%\\d+\\$[${PRINTF_SPECS}]` +
-  `|%[${PRINTF_SPECS}]` +
-  `|<[^>]+>` +
-  `|#` +
-  `)$`
-)
+    `\\{[a-zA-Z_$][a-zA-Z0-9_$]*(?:[^{}]|\\{[^{}]*\\})*\\}` + // ICU (simple or complex)
+    `|%\\([a-zA-Z_][a-zA-Z0-9_]*\\)[${PRINTF_SPECS}]` +
+    `|%\\d+\\$[${PRINTF_SPECS}]` +
+    `|%[${PRINTF_SPECS}]` +
+    `|<[^>]+>` +
+    `|#` +
+    `)$`,
+);
 
 /** Matches a complex ICU expression: {varName, keyword, …} */
-const COMPLEX_ICU_RE = /^\{([a-zA-Z_$][a-zA-Z0-9_$]*)\s*,\s*([a-zA-Z]+)/
+const COMPLEX_ICU_RE = /^\{([a-zA-Z_$][a-zA-Z0-9_$]*)\s*,\s*([a-zA-Z]+)/;
 
 /** Matches a case clause inside a complex ICU: selector { content } */
-const ICU_CASE_RE = /\b(zero|one|two|few|many|other|=\d+)\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g
+const ICU_CASE_RE =
+  /\b(zero|one|two|few|many|other|=\d+)\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g;
 
 /** Inline chip for a single placeholder token */
 function PlaceholderChip({
   token,
   title,
-  variant = 'blue'
+  variant = "blue",
 }: {
-  token: string
-  title?: string
-  variant?: 'blue' | 'amber'
+  token: string;
+  title?: string;
+  variant?: "blue" | "amber";
 }) {
   const cls =
-    variant === 'amber'
-      ? 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded px-0.5 text-xs font-mono'
-      : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded px-0.5 text-xs font-mono'
-  return <code className={cls} title={title}>{token}</code>
+    variant === "amber"
+      ? "bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded px-0.5 text-xs font-mono"
+      : "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded px-0.5 text-xs font-mono";
+  return (
+    <code className={cls} title={title}>
+      {token}
+    </code>
+  );
 }
 
 /**
@@ -356,25 +412,27 @@ function PlaceholderChip({
  */
 function ComplexIcuDisplay({ expression }: { expression: string }) {
   // Extract the header: "{varName, type, "
-  const headerMatch = expression.match(/^\{([a-zA-Z_$][a-zA-Z0-9_$]*)\s*,\s*([a-zA-Z]+)\s*,\s*/)
+  const headerMatch = expression.match(
+    /^\{([a-zA-Z_$][a-zA-Z0-9_$]*)\s*,\s*([a-zA-Z]+)\s*,\s*/,
+  );
   if (!headerMatch) {
     // Can't parse — render as plain mono block (should not normally happen)
     return (
       <code className="bg-blue-50 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200 rounded border border-blue-200 dark:border-blue-700/60 px-0.5 text-xs font-mono whitespace-normal break-words">
         {expression}
       </code>
-    )
+    );
   }
 
   // inner = everything between the header and the outer closing "}"
-  const inner = expression.slice(headerMatch[0].length, expression.length - 1)
+  const inner = expression.slice(headerMatch[0].length, expression.length - 1);
 
   // Parse each case clause
-  const cases: Array<{ selector: string; content: string }> = []
-  let m: RegExpExecArray | null
-  ICU_CASE_RE.lastIndex = 0
+  const cases: Array<{ selector: string; content: string }> = [];
+  let m: RegExpExecArray | null;
+  ICU_CASE_RE.lastIndex = 0;
   while ((m = ICU_CASE_RE.exec(inner)) !== null) {
-    cases.push({ selector: m[1], content: m[2] })
+    cases.push({ selector: m[1], content: m[2] });
   }
 
   if (cases.length === 0) {
@@ -383,29 +441,31 @@ function ComplexIcuDisplay({ expression }: { expression: string }) {
       <code className="bg-blue-50 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200 rounded border border-blue-200 dark:border-blue-700/60 px-0.5 text-xs font-mono whitespace-normal break-words">
         {expression}
       </code>
-    )
+    );
   }
 
   return (
     <span className="inline-flex flex-wrap items-baseline gap-0 rounded border border-blue-200 dark:border-blue-700/60 bg-blue-50 dark:bg-blue-950/50 text-xs font-mono px-1 py-px leading-snug">
       {/* structural header: {varName, type, */}
       <span className="text-blue-600 dark:text-blue-400">
-        {'{' + headerMatch[1] + ', ' + headerMatch[2] + ','}
+        {"{" + headerMatch[1] + ", " + headerMatch[2] + ","}
       </span>
       {cases.map(({ selector, content }, i) => (
         <React.Fragment key={i}>
           {/* case keyword: one / other / =1 … */}
-          <span className="text-blue-500 dark:text-blue-400 mx-1">{selector}</span>
-          <span className="text-blue-600 dark:text-blue-400">{'{'}</span>
+          <span className="text-blue-500 dark:text-blue-400 mx-1">
+            {selector}
+          </span>
+          <span className="text-blue-600 dark:text-blue-400">{"{"}</span>
           {/* translatable content — amber so it stands out */}
           <span className="text-amber-700 dark:text-amber-300">{content}</span>
-          <span className="text-blue-600 dark:text-blue-400">{'}'}</span>
+          <span className="text-blue-600 dark:text-blue-400">{"}"}</span>
         </React.Fragment>
       ))}
       {/* outer closing brace */}
-      <span className="text-blue-600 dark:text-blue-400">{'}'}</span>
+      <span className="text-blue-600 dark:text-blue-400">{"}"}</span>
     </span>
-  )
+  );
 }
 
 /**
@@ -416,16 +476,16 @@ function ComplexIcuDisplay({ expression }: { expression: string }) {
  *   amber translatable text so the translator sees exactly what to change
  */
 function HighlightedText({ text }: { text: string }) {
-  const parts = text.split(PLACEHOLDER_SPLIT_RE)
+  const parts = text.split(PLACEHOLDER_SPLIT_RE);
   return (
     <>
       {parts.map((part, i) => {
-        if (!PLACEHOLDER_IS_RE.test(part)) return <span key={i}>{part}</span>
+        if (!PLACEHOLDER_IS_RE.test(part)) return <span key={i}>{part}</span>;
         if (COMPLEX_ICU_RE.test(part)) {
-          return <ComplexIcuDisplay key={i} expression={part} />
+          return <ComplexIcuDisplay key={i} expression={part} />;
         }
-        return <PlaceholderChip key={i} token={part} variant="blue" />
+        return <PlaceholderChip key={i} token={part} variant="blue" />;
       })}
     </>
-  )
+  );
 }

@@ -2,13 +2,14 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
 import { v4 as uuidv4 } from 'uuid'
-import { levenshteinDistance, distanceToScore, MIN_FUZZY_SCORE, sortSuggestions } from '../../shared/utils/scoring'
-import type { Suggestion } from '../../shared/types/plugins'
-import type { Catalog } from '../../shared/types/catalog'
+import { levenshteinDistance, distanceToScore, MIN_FUZZY_SCORE, sortSuggestions } from '@shared/utils/scoring'
+import type { Suggestion } from '@shared/types/plugins'
 
 const SCHEMA = `
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
+PRAGMA cache_size = -2000;
+PRAGMA temp_store = MEMORY;
 
 CREATE TABLE IF NOT EXISTS translations (
   id          TEXT PRIMARY KEY,
@@ -164,20 +165,23 @@ export class TranslationMemory {
     return sortSuggestions(results).slice(0, limit)
   }
 
-  /** Bulk import translated items from a catalog */
-  importCatalog(catalog: Catalog): number {
-    const { sourceLanguage, targetLanguage } = catalog.metadata
-    const insert = this.db.transaction((items: Catalog['items']) => {
-      let count = 0
-      for (const item of items) {
-        if (item.isTranslated && !item.isFuzzy && item.translations[0]) {
-          this.upsert(sourceLanguage, targetLanguage, item.source, item.translations[0])
+  /** Bulk upsert pre-filtered translation pairs (source → translation) */
+  importItems(
+    sourceLanguage: string,
+    targetLanguage: string,
+    items: Array<{ source: string; translation: string }>
+  ): number {
+    const insert = this.db.transaction(
+      (rows: Array<{ source: string; translation: string }>) => {
+        let count = 0
+        for (const row of rows) {
+          this.upsert(sourceLanguage, targetLanguage, row.source, row.translation)
           count++
         }
+        return count
       }
-      return count
-    })
-    return insert(catalog.items)
+    )
+    return insert(items)
   }
 
   stats(): { entryCount: number; dbSizeBytes: number } {
