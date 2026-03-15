@@ -29,12 +29,28 @@ process.on("unhandledRejection", (reason) => {
   logError(reason);
 });
 
+/**
+ * Returns the correct icon path for the current platform.
+ * - macOS: undefined — the OS uses the .icns from the .app bundle automatically.
+ * - Windows/Linux: resolved from resourcesPath in packaged builds (via extraResources)
+ *   or from the source resources/ folder in dev mode.
+ */
+function getWindowIcon(): string | undefined {
+  if (process.platform === "darwin") return undefined;
+  const base = app.isPackaged
+    ? process.resourcesPath
+    : join(app.getAppPath(), "resources");
+  if (process.platform === "win32") return join(base, "windows", "icon.ico");
+  return join(base, "linux", "icons", "512x512.png");
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 1000,
     minWidth: 800,
     minHeight: 800,
+    icon: getWindowIcon(),
     show: false,
     frame: false,
     autoHideMenuBar: true,
