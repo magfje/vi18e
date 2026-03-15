@@ -12,7 +12,8 @@
     "dist": "bun run build && bunx electron-builder",
     "dist:win": "bun run build && bunx electron-builder --win --x64",
     "dist:mac": "bun run build && bunx electron-builder --mac",
-    "dist:linux": "bun run build && bunx electron-builder --linux --x64"
+    "dist:linux": "bun run build && bunx electron-builder --linux --x64",
+    "release": "bun scripts/release.mjs"
   },
   "overrides": {
     "tinyexec": "1.0.2"
