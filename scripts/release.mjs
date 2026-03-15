@@ -69,6 +69,6 @@ run(`git tag v${next}`);
 
 console.log(`\nTagged v${next}. Pushing to origin…\n`);
 run("git push");
-run("git push --tags");
+run(`git push origin v${next}`);
 
 console.log(`\n✓ v${next} pushed — GitHub Actions will build and draft the release.\n`);
