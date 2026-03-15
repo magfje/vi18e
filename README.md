@@ -1,8 +1,14 @@
+<img src="resources/icon.png" width="80" align="left" style="margin-right:16px" />
+
 # v(i18)e
 
 A modern translation editor for developers. Built with Electron, React, and TypeScript.
 
 ![License](https://img.shields.io/badge/license-MIT-green)
+
+<br clear="left" />
+
+![Screenshot](resources/screenshot/vi18e_Fpr3vef1pc.png)
 
 ## What it does
 
